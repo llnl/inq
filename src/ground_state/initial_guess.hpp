@@ -43,20 +43,13 @@ void initial_guess(const systems::ions & ions, systems::electrons & electrons, s
 	electrons.update_occupations(electrons.eigenvalues());
 	
 	if(ions.size() > 0){
-		electrons.spin_density() = electrons.atomic_pot().atomic_electronic_density(electrons.states_comm(), electrons.density_basis(), ions, electrons.states());
+		electrons.spin_density() = electrons.atomic_pot().atomic_electronic_density(electrons.states_comm(), electrons.density_basis(), ions, electrons.states(), magnet_dir);
 	} else {
 		electrons.spin_density() = observables::density::calculate(electrons);
 	}
-
 	assert(fabs(operations::integral_sum(electrons.spin_density())) > 1e-16);
 	
-	observables::density::normalize(electrons.spin_density(), electrons.states().num_electrons());
-
-	if (magnet_dir) {
-		assert(electrons.spin_density().set_size() > 1);
-		auto magnet_dir_ = {magnet_dir.value()[0], magnet_dir.value()[1], magnet_dir.value()[2]};
-		observables::density::rotate_total_magnetization(electrons.spin_density(), magnet_dir_);
-	}
+  observables::density::normalize(electrons.spin_density(), electrons.states().num_electrons());
 
 }
 }
@@ -183,10 +176,11 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons, mag_dir);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                        == 1.0);
+		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
+		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
+		
 	}
 }
 #endif
