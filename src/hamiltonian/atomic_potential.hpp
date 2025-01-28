@@ -25,6 +25,7 @@
 #include <parallel/partition.hpp>
 #include <solvers/poisson.hpp>
 #include <states/ks_states.hpp>
+#include <observables/magnetization.hpp>
 
 
 #include <unordered_map>
@@ -204,7 +205,7 @@ namespace hamiltonian {
 		////////////////////////////////////////////////////////////////////////////////////
 		
 		template <class CommType, class basis_type, class ions_type>
-		basis::field_set<basis_type, double> atomic_electronic_density(CommType & comm, const basis_type & basis, const ions_type & ions, states::ks_states const & states) const {
+		basis::field_set<basis_type, double> atomic_electronic_density(CommType & comm, const basis_type & basis, const ions_type & ions, states::ks_states const & states, std::vector<vector3<double>> const & magnet_dir = {}) const {
 
 			CALI_CXX_MARK_FUNCTION;
 
@@ -214,22 +215,30 @@ namespace hamiltonian {
 			basis::field_set<basis_type, double> density(basis, nspin);
 
 			density.fill(0.0);
-
-			double polarization = 1.0;
-			if(nspin > 1) polarization = 0.6;
+			
+			if (magnet_dir.size() > 0) {
+				assert(magnet_dir.size() == ions.size());
+			}
 			
 			for(auto iatom = part.start(); iatom < part.end(); iatom++){
 				
 				auto atom_position = ions.positions()[iatom];
 				
+				vector3<double> atomic_magnet = {0.0, 0.0, 0.0};
+				if (magnet_dir.size() > 0) {
+					atomic_magnet = magnet_dir[iatom];
+				}
+				
 				auto & ps = pseudo_for_element(ions.species(iatom));
+				
+				std::array<double, 4> polarization{};
+				polarization[0] = 1.0;
+				if (nspin > 1) polarization = observables::sdm_oriented(atomic_magnet);
 
 				if(ps.has_electronic_density()){
-
 					basis::spherical_grid sphere(basis, atom_position, ps.electronic_density_radius());
-					
-					gpu::run(nspin, sphere.size(),
-									 [dens = begin(density.hypercubic()), sph = sphere.ref(), spline = ps.electronic_density().function(), polarization] GPU_LAMBDA (auto ispin, auto ipoint){
+					gpu::run(sphere.size(),
+									 [dens = begin(density.hypercubic()), sph = sphere.ref(), spline = ps.electronic_density().function(), pol = polarization, nspin] GPU_LAMBDA (auto ipoint){
 										 auto rr = sph.distance(ipoint);
 										 auto density_val = spline(rr);
 										 auto pol = polarization;
@@ -244,7 +253,7 @@ namespace hamiltonian {
 					basis::spherical_grid sphere(basis, atom_position, 3.0);
 					
 					gpu::run(nspin, sphere.size(),
-									 [dens = begin(density.hypercubic()), sph = sphere.ref(), zval = ps.valence_charge(), polarization] GPU_LAMBDA (auto ispin, auto ipoint){
+									 [dens = begin(density.hypercubic()), sph = sphere.ref(), zval = ps.valence_charge(), pol = polarization, nspin] GPU_LAMBDA (auto ispin, auto ipoint){
 										 auto rr = sph.distance(ipoint);
 										 auto pol = polarization;
 										 if(ispin == 1) pol = 1.0 - pol;
@@ -255,7 +264,7 @@ namespace hamiltonian {
 			}
 
 			density.all_reduce(comm);
-			return density;			
+			return density;
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////
