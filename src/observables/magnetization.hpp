@@ -36,6 +36,24 @@ GPU_FUNCTION auto local_magnetization(Density const & spin_density, int const & 
 	return mag_density;
 }
 
+
+///////////////////////////////////////////////////////////////
+
+auto sdm_oriented(vector3<double> const & mp) {
+
+	std::array<double, 4> ret{};
+	double const tol = 1.e-10;
+
+	assert(norm(mp) <= 1.0+tol);
+
+	ret[0] = 0.5*(1.0 + mp[2]);
+	ret[1] = 0.5*(1.0 - mp[2]);
+	ret[2] = mp[0]/2.0;
+	ret[3] = -mp[1]/2.0;
+	
+	return ret;
+}
+
 basis::field<basis::real_space, vector3<double>> magnetization(basis::field_set<basis::real_space, double> const & spin_density){
 
 	// The formula comes from here: https://gitlab.com/npneq/inq/-/wikis/Magnetization
