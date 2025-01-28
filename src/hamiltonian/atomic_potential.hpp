@@ -240,6 +240,10 @@ namespace hamiltonian {
 				}
 				
 				auto & ps = pseudo_for_element(ions.species(iatom));
+				
+				std::array<double, 4> polarization{};
+				polarization[0] = 1.0;
+				if (nspin > 1) polarization = observables::sdm_oriented(atomic_magnet);
 
 				if(ps.has_electronic_density()){
 					basis::spherical_grid sphere(basis, atom_position, ps.electronic_density_radius());
