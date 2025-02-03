@@ -75,23 +75,113 @@ auto total_magnetization(basis::field_set<basis::real_space, double> const & spi
 	}
 }
 
-void local_magnetic_moments(basis::field_set<basis::real_space, double> const & spin_density, std::vector<double> const & magnetic_radii, std::vector<vector3<double>> const & magnetic_centers, std::vector<vector3<double>> & magnetic_moments) {
-	auto nspin = spin_density.set_size();
-	basis::field<basis::real_space, vector3<double>> local_mag_density(spin_density.basis());
-	for (auto i = 0; i < magnetic_moments.size(); i++) {
-		std::cout << "i: " << i << std::endl;
-		local_mag_density.fill(vector3<double>{0.0, 0.0, 0.0});
-		gpu::run(spin_density.local_set_size(), spin_density.basis().local_sizes()[2], spin_density.basis().local_sizes()[1], spin_density.basis().local_sizes()[0],
-		[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.cubic()), point_op = spin_density.basis().point_op(), mr = magnetic_radii[i], mcs = magnetic_centers, mc = magnetic_centers[i], nspin] GPU_LAMBDA (auto ist, auto iz, auto iy, auto ix){
-			auto rr = point_op.rvector_cartesian(ix, iy, iz);
-			auto dd = sqrt(norm(rr - mc));
-			//for (auto i = 0; i < mcs.size(); i++) {
-
-			//}
-			if (dd <= mr) magd[ix][iy][iz] = local_magnetization(spd[ix][iy][iz], nspin);
-		});
-		magnetic_moments[i] = operations::integral(local_mag_density);
+template <typename PtType, typename LattType>
+GPU_FUNCTION auto distance_two_grid_points(PtType const & r1, PtType const & r2, int const periodicity, LattType const & lattice) {
+	auto DMAX = sqrt(norm(lattice[0])) + sqrt(norm(lattice[1])) + sqrt(norm(lattice[2]));
+	DMAX = DMAX * 10.0;
+	auto dd = DMAX;
+	if (periodicity == 0) {
+		dd = sqrt(norm(r1 - r2));
 	}
+	else if (periodicity == 1) {
+		auto L1 = lattice[0];
+		for (auto i1 = -1; i1 < 2; i1++) {
+			if (sqrt(norm(r1 - r2 + i1*L1)) < dd) dd = sqrt(norm(r1 - r2 + i1*L1));
+		}
+	}
+	else if (periodicity == 2) {
+		auto L1 = lattice[0];
+		auto L2 = lattice[1];
+		for (auto i1 = -1; i1 < 2; i1++) {
+			for (auto i2 = -1; i2 < 2; i2++) {
+				if (sqrt(norm(r1 - r2 + i1*L1 + i2*L2)) < dd) dd = sqrt(norm(r1 - r2 + i1*L1 + i2*L2));
+			}
+		}
+	}
+	else if (periodicity == 3) {
+		auto L1 = lattice[0];
+		auto L2 = lattice[1];
+		auto L3 = lattice[2];
+		for (auto i1 = -1; i1 < 2; i1++) {
+			for (auto i2 = -1; i2 < 2; i2++) {
+				for (auto i3 = -1; i3 < 2; i3++) {
+					if (sqrt(norm(r1 - r2 + i1*L1 + i2*L2 + i3*L3)) < dd) dd = sqrt(norm(r1 - r2 + i1*L1 + i2*L2 + i3*L3));
+				}
+			}
+		}
+	}
+	return dd;
+}
+
+void integrate_magnet_density(basis::field_set<basis::real_space, vector3<double>> const & local_mag_density, std::vector<vector3<double>> & magnetic_moments) {
+	auto nmagc = magnetic_moments.size();
+	basis::field<basis::real_space, vector3<double>> rfield(local_mag_density.basis());
+	for (auto i = 0; i < nmagc; i++) {
+		rfield.fill(vector3<double>{0.0, 0.0, 0.0});
+		gpu::run(local_mag_density.basis().local_size(),
+			[magd = begin(local_mag_density.matrix()), rf = begin(rfield.linear()), index = i] GPU_LAMBDA (auto ip){
+				rf[ip] = magd[ip][index];
+			});
+		magnetic_moments[i] = operations::integral(rfield);
+	}
+}
+
+template <typename CellType>
+void local_magnetic_moments_radii(basis::field_set<basis::real_space, double> const & spin_density, std::vector<double> const & magnetic_radii, std::vector<vector3<double>> const & magnetic_centers, int const periodicity, CellType const & cell, std::vector<vector3<double>> & magnetic_moments) {
+	auto nspin = spin_density.set_size();
+	auto nmagc = magnetic_moments.size();
+	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
+	basis::field_set<basis::real_space, vector3<double>> local_mag_density(spin_density.basis(), nmagc);
+	local_mag_density.fill(vector3<double>{0.0, 0.0, 0.0});
+	gpu::run(spin_density.basis().local_sizes()[2], spin_density.basis().local_sizes()[1], spin_density.basis().local_sizes()[0],
+	[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mrs = magnetic_radii.begin(), mcs = magnetic_centers.begin(), latt = lattice.begin(), nspin, nmagc, periodicity] GPU_LAMBDA (auto iz, auto iy, auto ix){
+			auto rr = point_op.rvector_cartesian(ix, iy, iz);
+			for (auto i = 0; i < nmagc; i++) {
+				auto dd = distance_two_grid_points(rr, mcs[i], periodicity, latt);
+				if (dd <= mrs[i]) magd[ix][iy][iz][i] = local_magnetization(spd[ix][iy][iz], nspin);
+			}
+		});
+	integrate_magnet_density(local_mag_density, magnetic_moments);
+}
+
+template <typename CellType>
+void local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double>> const & magnetic_centers, int const periodicity, CellType const & cell, std::vector<vector3<double>> & magnetic_moments) {
+	auto nspin = spin_density.set_size();
+	auto nmagc = magnetic_moments.size();
+	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
+	auto DMAX = sqrt(norm(lattice[0])) + sqrt(norm(lattice[1])) + sqrt(norm(lattice[2]));
+	DMAX = DMAX * 10.0;
+	basis::field_set<basis::real_space, vector3<double>> local_mag_density(spin_density.basis(), nmagc);
+	local_mag_density.fill(vector3<double>{0.0, 0.0, 0.0});
+	gpu::run(spin_density.basis().local_sizes()[2], spin_density.basis().local_sizes()[1], spin_density.basis().local_sizes()[0],
+		[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mcs = magnetic_centers.begin(), latt = lattice.begin(), nspin, nmagc, periodicity, DMAX] GPU_LAMBDA (auto iz, auto iy, auto ix){
+			auto rr = point_op.rvector_cartesian(ix, iy, iz);
+			auto dd2 = DMAX;
+			auto j = -1;
+			for (auto i = 0; i < nmagc; i++) {
+				auto dd = distance_two_grid_points(rr, mcs[i], periodicity, latt);
+				if (dd < dd2) {
+					dd2 = dd;
+					j = i;
+				}
+			}
+			magd[ix][iy][iz][j] = local_magnetization(spd[ix][iy][iz], nspin);
+		});
+	integrate_magnet_density(local_mag_density, magnetic_moments);
+}
+
+template <typename CellType>
+auto compute_local_magnetic_moments(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double>> const & magnetic_centers, CellType const & cell, std::vector<double> const & magnetic_radii = {}) {
+	std::vector<vector3<double>> magnetic_moments = {};
+	for (auto i = 0; i < magnetic_centers.size(); i++) magnetic_moments.push_back(vector3<double> {0.0, 0.0, 0.0});
+	if (magnetic_radii.empty()) {
+		local_magnetic_moments_voronoi(spin_density, magnetic_centers, cell.periodicity(), cell, magnetic_moments);
+	}
+	else {
+		assert(magnetic_radii.size() == magnetic_centers.size());
+		local_magnetic_moments_radii(spin_density, magnetic_radii, magnetic_centers, cell.periodicity(), cell, magnetic_moments);
+	}
+	return magnetic_moments;
 }
 
 }
