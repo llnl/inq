@@ -172,7 +172,7 @@ void local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> 
 
 template <typename CellType>
 auto compute_local_magnetic_moments(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double>> const & magnetic_centers, CellType const & cell, std::vector<double> const & magnetic_radii = {}) {
-	std::vector<vector3<double>> magnetic_moments = {};
+	std::vector<vector3<double>> magnetic_moments;
 	for (auto i = 0; i < magnetic_centers.size(); i++) magnetic_moments.push_back(vector3<double> {0.0, 0.0, 0.0});
 	if (magnetic_radii.empty()) {
 		local_magnetic_moments_voronoi(spin_density, magnetic_centers, cell.periodicity(), cell, magnetic_moments);
@@ -200,8 +200,65 @@ auto compute_local_magnetic_moments(basis::field_set<basis::real_space, double> 
 TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 	using namespace inq;
+	using namespace inq::magnitude;
 	using namespace Catch::literals;
 	using Catch::Approx;
+
+	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
+
+	SECTION("SPIN POLARIZED INITIALIZATION"){
+		
+		auto par = input::parallelization(comm);
+		auto cell = systems::cell::cubic(15.0_b).finite();
+		auto ions = systems::ions(cell);
+		ions.insert("Fe", {0.0_b, 0.0_b, 0.0_b});
+		auto conf = options::electrons{}.cutoff(40.0_Ha).extra_states(10).temperature(300.0_K).spin_polarized();
+		auto electrons = systems::electrons(par, ions, conf);
+		std::vector<vector3<double>> initial_magnetization = {{0.0, 0.0, 1.0}};
+
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		auto mag = observables::total_magnetization(electrons.spin_density());
+		std::vector<vector3<double>> magnetic_centers;
+		for (auto i=0; i<initial_magnetization.size(); i++) magnetic_centers.push_back(ions.positions()[i]);
+		auto magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		Approx target = Approx(mag[2]).epsilon(1.e-10);
+		CHECK(magnetic_moments[0][2] == target);
+
+		initial_magnetization = {{0.0, 0.0, -1.0}};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		target = Approx(mag[2]).epsilon(1.e-10);
+		CHECK(magnetic_moments[0][2] == target);
+
+		auto a = 6.1209928_A;
+		cell = systems::cell::lattice({-a/2.0, 0.0_A, a/2.0}, {0.0_A, a/2.0, a/2.0}, {-a/2.0, a/2.0, 0.0_A});
+		assert(cell.periodicity() == 3);
+		ions = systems::ions(cell);
+		ions.insert_fractional("Fe", {0.0, 0.0, 0.0});
+		ions.insert_fractional("Fe", {0.5, 0.5, 0.5});
+		conf = options::electrons{}.cutoff(40.0_Ha).extra_states(10).temperature(300.0_K).spin_polarized();
+		electrons = systems::electrons(par, ions, conf);
+		initial_magnetization = {
+			{0.0, 0.0, 0.5}, 
+			{0.0, 0.0, -0.5}
+		};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_centers = {};
+		for (auto i=0; i<initial_magnetization.size(); i++) magnetic_centers.push_back(ions.positions()[i]);
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
+
+		initial_magnetization = {
+			{0.0, 0.0, 0.5}, 
+			{0.0, 0.0, 0.5}
+		};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
+	}
 
 }
 #endif
