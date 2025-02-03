@@ -76,7 +76,7 @@ auto total_magnetization(basis::field_set<basis::real_space, double> const & spi
 }
 
 template <typename PtType, typename LattType>
-GPU_FUNCTION auto distance_two_grid_points(PtType const & r1, PtType const & r2, int const periodicity, LattType const & lattice) {
+GPU_FUNCTION double distance_two_grid_points(PtType const & r1, PtType const & r2, int const periodicity, LattType const & lattice) {
 	auto DMAX = sqrt(norm(lattice[0])) + sqrt(norm(lattice[1])) + sqrt(norm(lattice[2]));
 	DMAX = DMAX * 10.0;
 	auto dd = DMAX;
