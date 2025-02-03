@@ -324,5 +324,59 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
 	}
 
+	SECTION("SPIN NON COLLINEAR INITIALIZATION"){
+		
+		auto par = input::parallelization(comm);
+		auto cell = systems::cell::cubic(15.0_b).finite();
+		auto ions = systems::ions(cell);
+		ions.insert("Fe", {0.0_b, 0.0_b, 0.0_b});
+		auto conf = options::electrons{}.cutoff(40.0_Ha).extra_states(10).temperature(300.0_K).spin_non_collinear();
+		auto electrons = systems::electrons(par, ions, conf);
+		std::vector<vector3<double>> initial_magnetization = {{1.0, 0.0, 0.0}};
+
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		auto mag = observables::total_magnetization(electrons.spin_density());
+		std::vector<vector3<double>> magnetic_centers;
+		for (auto i=0; i<initial_magnetization.size(); i++) magnetic_centers.push_back(ions.positions()[i]);
+		auto magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		Approx target = Approx(mag[0]).epsilon(1.e-10);
+		CHECK(magnetic_moments[0][0] == target);
+
+		initial_magnetization = {{-1.0, 0.0, 0.0}};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		target = Approx(mag[0]).epsilon(1.e-10);
+		CHECK(magnetic_moments[0][0] == target);
+
+		auto a = 6.1209928_A;
+		cell = systems::cell::lattice({-a/2.0, 0.0_A, a/2.0}, {0.0_A, a/2.0, a/2.0}, {-a/2.0, a/2.0, 0.0_A});
+		assert(cell.periodicity() == 3);
+		ions = systems::ions(cell);
+		ions.insert_fractional("Fe", {0.0, 0.0, 0.0});
+		ions.insert_fractional("Ni", {0.5, 0.5, 0.5});
+		conf = options::electrons{}.cutoff(40.0_Ha).extra_states(10).temperature(300.0_K).spin_non_collinear();
+		electrons = systems::electrons(par, ions, conf);
+		initial_magnetization = {
+			{0.0, 0.0, 0.5}, 
+			{0.0, 0.0, -0.5}
+		};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_centers = {};
+		for (auto i=0; i<initial_magnetization.size(); i++) magnetic_centers.push_back(ions.positions()[i]);
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
+
+		initial_magnetization = {
+			{0.0, 0.0, 0.5}, 
+			{0.0, 0.0, 0.5}
+		};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
+	}
+
 }
 #endif
