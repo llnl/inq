@@ -482,10 +482,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 		CHECK(nn_pol.set_size() == 2);
 		CHECK(operations::integral_sum(nn_pol) == 29.9562519176_a);
-		CHECK(nn_pol.hypercubic()[5][3][0][0] == Approx(1.2*0.066529473));
-		CHECK(nn_pol.hypercubic()[3][1][0][0] == Approx(1.2*0.0923002217));
-		CHECK(nn_pol.hypercubic()[5][3][0][1] == Approx(0.8*0.066529473));
-		CHECK(nn_pol.hypercubic()[3][1][0][1] == Approx(0.8*0.0923002217));
+		CHECK(nn_pol.hypercubic()[5][3][0][0] == Approx(0.066529473));
+		CHECK(nn_pol.hypercubic()[3][1][0][0] == Approx(0.0923002217));
+		CHECK(nn_pol.hypercubic()[5][3][0][1] == Approx(0.066529473));
+		CHECK(nn_pol.hypercubic()[3][1][0][1] == Approx(0.0923002217));
 		
 		CHECK(pot.has_nlcc());
 		
