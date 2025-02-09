@@ -76,7 +76,7 @@ auto total_magnetization(basis::field_set<basis::real_space, double> const & spi
 }
 
 template <typename PtType, typename LattType>
-GPU_FUNCTION double distance_two_grid_points(PtType const & r1, PtType const & r2, int const periodicity, LattType const & lattice) {
+GPU_FUNCTION auto distance_two_grid_points(PtType const & r1, PtType const & r2, int const periodicity, LattType const & lattice) {
 	auto DMAX = sqrt(norm(lattice[0])) + sqrt(norm(lattice[1])) + sqrt(norm(lattice[2]));
 	DMAX = DMAX * 10.0;
 	auto dd = DMAX;
@@ -131,10 +131,13 @@ void local_magnetic_moments_radii(basis::field_set<basis::real_space, double> co
 	auto nspin = spin_density.set_size();
 	auto nmagc = magnetic_moments.size();
 	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
+	gpu::array<vector3<double>, 1> lattice_ = lattice;
+	gpu::array<vector3<double>, 1> magnetic_centers_ = magnetic_centers;
+	gpu::array<double, 1> magnetic_radii_ = magnetic_radii;
 	basis::field_set<basis::real_space, vector3<double>> local_mag_density(spin_density.basis(), nmagc);
 	local_mag_density.fill(vector3<double>{0.0, 0.0, 0.0});
 	gpu::run(spin_density.basis().local_sizes()[2], spin_density.basis().local_sizes()[1], spin_density.basis().local_sizes()[0],
-	[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mrs = magnetic_radii.begin(), mcs = magnetic_centers.begin(), latt = lattice.begin(), nspin, nmagc, periodicity] GPU_LAMBDA (auto iz, auto iy, auto ix){
+		[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mrs = magnetic_radii_.begin(), mcs = magnetic_centers_.begin(), latt = lattice_.begin(), nspin, nmagc, periodicity] GPU_LAMBDA (auto iz, auto iy, auto ix){
 			auto rr = point_op.rvector_cartesian(ix, iy, iz);
 			for (auto i = 0; i < nmagc; i++) {
 				auto dd = distance_two_grid_points(rr, mcs[i], periodicity, latt);
@@ -149,12 +152,14 @@ void local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> 
 	auto nspin = spin_density.set_size();
 	auto nmagc = magnetic_moments.size();
 	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
+	gpu::array<vector3<double>, 1> lattice_ = lattice;
+	gpu::array<vector3<double>, 1> magnetic_centers_ = magnetic_centers;
 	auto DMAX = sqrt(norm(lattice[0])) + sqrt(norm(lattice[1])) + sqrt(norm(lattice[2]));
 	DMAX = DMAX * 10.0;
 	basis::field_set<basis::real_space, vector3<double>> local_mag_density(spin_density.basis(), nmagc);
 	local_mag_density.fill(vector3<double>{0.0, 0.0, 0.0});
 	gpu::run(spin_density.basis().local_sizes()[2], spin_density.basis().local_sizes()[1], spin_density.basis().local_sizes()[0],
-		[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mcs = magnetic_centers.begin(), latt = lattice.begin(), nspin, nmagc, periodicity, DMAX] GPU_LAMBDA (auto iz, auto iy, auto ix){
+		[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mcs = magnetic_centers_.begin(), latt = lattice_.begin(), nspin, nmagc, periodicity, DMAX] GPU_LAMBDA (auto iz, auto iy, auto ix){
 			auto rr = point_op.rvector_cartesian(ix, iy, iz);
 			auto dd2 = DMAX;
 			auto j = -1;
