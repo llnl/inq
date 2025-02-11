@@ -114,7 +114,7 @@ GPU_FUNCTION auto distance_two_grid_points(PtType const & r1, PtType const & r2,
 }
 
 void integrate_magnet_density(basis::field_set<basis::real_space, vector3<double>> const & local_mag_density, std::vector<vector3<double>> & magnetic_moments) {
-	auto nmagc = magnetic_moments.size();
+	auto nmagc = static_cast<int>(magnetic_moments.size());
 	basis::field<basis::real_space, vector3<double>> rfield(local_mag_density.basis());
 	for (auto i = 0; i < nmagc; i++) {
 		rfield.fill(vector3<double>{0.0, 0.0, 0.0});
@@ -129,7 +129,7 @@ void integrate_magnet_density(basis::field_set<basis::real_space, vector3<double
 template <typename CellType>
 void local_magnetic_moments_radii(basis::field_set<basis::real_space, double> const & spin_density, std::vector<double> const & magnetic_radii, std::vector<vector3<double>> const & magnetic_centers, int const periodicity, CellType const & cell, std::vector<vector3<double>> & magnetic_moments) {
 	auto nspin = spin_density.set_size();
-	auto nmagc = magnetic_moments.size();
+	auto nmagc = static_cast<int>(magnetic_centers.size());
 	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
 	gpu::array<vector3<double>, 1> lattice_ = lattice;
 	gpu::array<vector3<double>, 1> magnetic_centers_ = magnetic_centers;
@@ -150,7 +150,7 @@ void local_magnetic_moments_radii(basis::field_set<basis::real_space, double> co
 template <typename CellType>
 void local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double>> const & magnetic_centers, int const periodicity, CellType const & cell, std::vector<vector3<double>> & magnetic_moments) {
 	auto nspin = spin_density.set_size();
-	auto nmagc = magnetic_moments.size();
+	auto nmagc = static_cast<int>(magnetic_centers.size());
 	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
 	gpu::array<vector3<double>, 1> lattice_ = lattice;
 	gpu::array<vector3<double>, 1> magnetic_centers_ = magnetic_centers;
