@@ -237,16 +237,10 @@ public:
 		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density());
 		auto normres = res.energy.calculate(ham_, electrons);
 			
-		if(solver_.calc_forces() and electrons.states().spinor_dim() == 1) {
+		if(solver_.calc_forces()) {
 			auto fas = observables::forces_stress{ions_, electrons, ham_, res.energy};
 			res.forces = fas.forces;
 			res.stress = fas.stress;
-		}
-
-		if(solver_.calc_forces() and electrons.states().spinor_dim() == 2) {
-			if(solver_.verbose_output() and console) {
-				console->warn("\nSkipping calculation of the forces, they are not implemented for spinors.");
-			}
 		}
 		
 		auto ev_out = eigenvalues_output(electrons, normres);		

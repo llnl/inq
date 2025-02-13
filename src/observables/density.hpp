@@ -60,18 +60,15 @@ void calculate_gradient_add(const occupations_array_type & occupations, field_se
 
 	CALI_CXX_MARK_SCOPE("density::calculate_gradient");
 
-	if(not phi.spinors()){
-
-		gpu::run(phi.basis().part().local_size(),
-						 [nst = phi.set_part().local_size(), occs = begin(occupations),
-							phip = begin(phi.matrix()), gphip = begin(gphi.matrix()), gdensityp = begin(gdensity.linear())] GPU_LAMBDA (auto ip){
-							 for(int ist = 0; ist < nst; ist++) gdensityp[ip] += occs[ist]*real(conj(gphip[ip][ist])*phip[ip][ist] + conj(phip[ip][ist])*gphip[ip][ist]);
-						 });
-		
-	} else {
-		throw std::logic_error("Not implemented");
-	}
-		
+	gpu::run(phi.basis().part().local_size(),
+					 [nst = phi.local_spinor_set_size(), occs = begin(occupations),	phip = begin(phi.spinor_array()), gphip = begin(gphi.spinor_array()), gdensityp = begin(gdensity.linear()), nspinor = phi.spinor_dim()]
+					 GPU_LAMBDA (auto ip){
+						 for(int ispinor = 0; ispinor < nspinor; ispinor++){
+							 for(int ist = 0; ist < nst; ist++) {
+								 gdensityp[ip] += occs[ist]*real(conj(gphip[ip][ispinor][ist])*phip[ip][ispinor][ist] + conj(phip[ip][ispinor][ist])*gphip[ip][ispinor][ist]);
+							 }
+						 }
+					 });
 }
 
 ///////////////////////////////////////////////////////////////

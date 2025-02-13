@@ -30,8 +30,8 @@ assert pinq.util.match(pinq.results.ground_state.energy.nvxc(),             -0.1
 assert pinq.util.match(pinq.results.ground_state.energy.exact_exchange(),    0.000000000000, 3e-5)
 assert pinq.util.match(pinq.results.ground_state.energy.ion(),              -0.365304170454, 3e-5)
   
-assert pinq.util.match(pinq.results.ground_state.forces()[0],  [7.26217835896163880644e-11, -8.66073022870166591849e-11,  1.46550554264721099619e-03], 3e-5)
-assert pinq.util.match(pinq.results.ground_state.forces()[1],  [8.64681672462082104618e-11, -5.46191861868080879087e-11, -1.46550559849585658283e-03], 3e-5)
+assert pinq.util.match(pinq.results.ground_state.forces()[0],  [3.74786824263793630366e-11, -1.05853471242772412887e-10,  1.31008348141167883100e-03], 3e-5)
+assert pinq.util.match(pinq.results.ground_state.forces()[1],  [6.54160820496192356550e-11, -6.38554194489870691095e-11, -1.31008351907754708524e-03], 3e-5)
 
 pinq.real_time.num_steps(3000)
 pinq.real_time.time_step(0.075, "atu")

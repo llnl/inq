@@ -87,54 +87,43 @@ public:
 		return full_density;
 	}
 
-	////////////////////////////////////////////////////////////////////////////////////////////
-
-	template <typename VXC, typename VKS>
-	void process_potential(VXC const & vxc, VKS & vks) const {
-
-		gpu::run(vxc.local_set_size(), vxc.basis().local_size(),
-			[vx = begin(vxc.matrix()), vk = begin(vks.matrix())] GPU_LAMBDA (auto is, auto ip){
-				vk[ip][is] += vx[ip][is];
-			});
-	}
-
 	///////////////////////////////////////////////////////////////////////////////////////////
 
 	template <typename SpinDensityType, typename VXC>
 	double compute_nvxc(SpinDensityType const & spin_density, VXC const & vxc) const {
+
+		CALI_CXX_MARK_FUNCTION;
 		
-		auto nvxc_ = 0.0;
-		if (spin_density.set_size() == 4) {
-			gpu::run(spin_density.local_set_size(), spin_density.basis().local_size(),
-					[vx = begin(vxc.matrix())] GPU_LAMBDA (auto is, auto ip){
-						if (is == 2){
-							vx[ip][is] = 2.0*vx[ip][is];
-						}
-						else if (is == 3){
-							vx[ip][is] = -2.0*vx[ip][is];
-						}
-					});
+		auto nvxc = gpu::run(gpu::reduce(spin_density.basis().local_size()), 0.0,
+												 [den = begin(spin_density.matrix()), vx = begin(vxc.matrix()), nspin = spin_density.local_set_size()] GPU_LAMBDA (auto ip){
+													 if(nspin == 1) return den[ip][0]*vx[ip][0];
+													 if(nspin == 2) return den[ip][0]*vx[ip][0] + den[ip][1]*vx[ip][1];
+													 if(nspin == 4) return den[ip][0]*vx[ip][0] + den[ip][1]*vx[ip][1] + 2.0*den[ip][2]*vx[ip][2] - 2.0*den[ip][3]*vx[ip][3];
+													 return 0.0;
+												 });
+												 
+		if(spin_density.basis().comm().size() > 1) {
+			spin_density.basis().comm().all_reduce_in_place_n(&nvxc, 1, std::plus<>{});
 		}
-		nvxc_ += operations::integral_product_sum(spin_density, vxc);
-		return nvxc_;
+			
+		return nvxc*spin_density.basis().volume_element();
 	}
 
   ////////////////////////////////////////////////////////////////////////////////////////////
 	
-  template <typename SpinDensityType, typename CoreDensityType, typename VKSType>
-  void operator()(SpinDensityType const & spin_density, CoreDensityType const & core_density, VKSType & vks, double & exc, double & nvxc) const {
-    
-      exc = 0.0;
+  template <typename SpinDensityType, typename CoreDensityType>
+  auto operator()(SpinDensityType const & spin_density, CoreDensityType const & core_density, double & exc, double & nvxc) const {
+
+		basis::field_set<basis::real_space, double> vxc(spin_density.skeleton());
+		vxc.fill(0.0);
+		exc = 0.0;
 		nvxc = 0.0;
-		if(not any_true_functional()) return;
+		if(not any_true_functional()) return vxc;
 		
 		auto full_density = process_density(spin_density, core_density);
 		
 		double efunc = 0.0;
 		
-		basis::field_set<basis::real_space, double> vxc(spin_density.skeleton());
-		vxc.fill(0.0);
-
 		basis::field_set<basis::real_space, double> vfunc(full_density.skeleton());
 		auto density_gradient = std::optional<decltype(operations::gradient(full_density))>{};
 		if(any_requires_gradient()) density_gradient.emplace(operations::gradient(full_density));
@@ -148,8 +137,9 @@ public:
 			exc += efunc;
 		}
 
-		process_potential(vxc, vks);
 		nvxc += compute_nvxc(spin_density, vxc);
+
+		return vxc;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////

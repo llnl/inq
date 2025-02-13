@@ -147,12 +147,6 @@ else()  # some systems do not have fftw3 registered in pkg-config, in this case 
   endif()
 endif()
 
-if(ENABLE_HEFFTE)
-  find_package(Heffte REQUIRED)
-  #get_target_property(HEFFTE_INCLUDE_DIRS Heffte::Heffte INTERFACE_INCLUDE_DIRECTORIES)
-  target_link_libraries(inq INTERFACE Heffte::Heffte)
-endif()
-
 # Multi
 #set(multi_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/external_libs/multi/boost/include)
 

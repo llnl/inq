@@ -95,11 +95,10 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////		
 	
-	template <typename KpointType>
-	gpu::array<complex, 3> calculate_projections(states::orbital_set<basis::real_space, complex> const & phi, KpointType const & kpoint) const {
+	template <typename Type, typename KpointType>
+	gpu::array<Type, 3> gather(states::orbital_set<basis::real_space, Type> const & phi, KpointType const & kpoint) const {
 
-		gpu::array<complex, 3> sphere_phi_all({nprojs_, max_sphere_size_, phi.local_set_size()});
-		gpu::array<complex, 3> projections_all({nprojs_, max_nlm_, phi.local_set_size()}, 0.0);
+		gpu::array<Type, 3> sphere_phi_all({nprojs_, max_sphere_size_, phi.local_set_size()});
 
 		{ CALI_CXX_MARK_SCOPE("projector::gather");
 				
@@ -109,11 +108,22 @@ public:
 									 auto phase = polar(1.0, dot(kpoint, pos[iproj][ipoint]));
 									 sgr[iproj][ipoint][ist] = phase*gr[poi[iproj][ipoint][0]][poi[iproj][ipoint][1]][poi[iproj][ipoint][2]][ist];
 								 } else {
-									 sgr[iproj][ipoint][ist] = complex(0.0, 0.0);
+									 sgr[iproj][ipoint][ist] = zero<Type>();
 								 }
 							 });
 		}
+		
+		return sphere_phi_all;
+	}
 
+	////////////////////////////////////////////////////////////////////////////////////////////		
+	
+	template <typename KpointType>
+	gpu::array<complex, 3> calculate_projections(states::orbital_set<basis::real_space, complex> const & phi, KpointType const & kpoint) const {
+		
+		auto sphere_phi_all = gather(phi, kpoint);
+		gpu::array<complex, 3> projections_all({nprojs_, max_nlm_, phi.local_set_size()}, 0.0);
+		
 #ifndef ENABLE_CUDA
 		for(auto iproj = 0; iproj < nprojs_; iproj++){
 			CALI_CXX_MARK_SCOPE("projector_gemm_1");
@@ -269,30 +279,14 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////
 
 	
-	template <typename PhiType, typename GPhiType, typename MetricType, typename OccsType, typename KPoint>
-	void force(PhiType & phi, GPhiType const & gphi, MetricType const & metric,
-						 OccsType const & occs, vector3<double, covariant> const & vector_potential, KPoint const & kpoint, gpu::array<vector3<double>, 1> & forces_non_local) const {
+	template <typename PhiType, typename GPhiType, typename OccsType, typename KPoint>
+	void force(PhiType & phi, GPhiType const & gphi, OccsType const & occs, KPoint const & kpoint, gpu::array<vector3<double>, 1> & forces_non_local) const {
 
 		CALI_CXX_MARK_FUNCTION;
 
 		namespace blas = boost::multi::blas;
 
-		gpu::array<typename GPhiType::element_type, 3> sphere_gphi_all({nprojs_, max_sphere_size_, phi.local_set_size()});
- 
-		{ CALI_CXX_MARK_SCOPE("projector_all::force::gather");
-				
-			gpu::run(phi.local_set_size(), max_sphere_size_, nprojs_,
-							 [gsgr = begin(sphere_gphi_all), gr = begin(phi.hypercubic()), ggr = begin(gphi.hypercubic()), poi = begin(points_), pos = begin(positions_), kpoint]
-							 GPU_LAMBDA (auto ist, auto ipoint, auto iproj){
-								 if(poi[iproj][ipoint][0] >= 0){
-									 auto phase = polar(1.0, dot(kpoint, pos[iproj][ipoint]));
-									 gsgr[iproj][ipoint][ist] = phase*ggr[poi[iproj][ipoint][0]][poi[iproj][ipoint][1]][poi[iproj][ipoint][2]][ist];
-								 } else {
-									 gsgr[iproj][ipoint][ist] = {complex(0.0), complex(0.0), complex(0.0)};
-								 }
-							 });
-		}
-
+		auto sphere_gphi_all = gather(gphi, kpoint);
 		auto sphere_phi_all = project(phi, kpoint);
 		gpu::array<vector3<double, covariant>, 1> force(nprojs_, {0.0, 0.0, 0.0});
 			
@@ -301,15 +295,16 @@ public:
 			
 				CALI_CXX_MARK_SCOPE("projector_force_sum");
 				force[iproj] = gpu::run(gpu::reduce(phi.local_set_size()), gpu::reduce(max_sphere_size_), zero<vector3<double, covariant>>(),
-																[oc = begin(occs), phi = begin(sphere_phi_all[iproj]), gphi = begin(sphere_gphi_all[iproj])] GPU_LAMBDA (auto ist, auto ip) {
-																	return -2.0*oc[ist]*real(phi[ip][ist]*conj(gphi[ip][ist]));
+																[oc = begin(occs), phi = begin(sphere_phi_all[iproj]), gphi = begin(sphere_gphi_all[iproj]), spinor_size = phi.local_spinor_set_size()] GPU_LAMBDA (auto ist, auto ip) {
+																	auto ist_spinor = ist%spinor_size;
+																	return -2.0*oc[ist_spinor]*real(phi[ip][ist]*conj(gphi[ip][ist]));
 																});
 		}
 
 		for(auto iproj = 0; iproj < nprojs_; iproj++) {
 			if(locally_empty_[iproj]) continue;
 			
-			forces_non_local[iatom_[iproj]] += phi.basis().volume_element()*metric.to_cartesian(force[iproj]);
+			forces_non_local[iatom_[iproj]] += phi.basis().volume_element()*phi.basis().cell().metric().to_cartesian(force[iproj]);
 		}
 		
 	}

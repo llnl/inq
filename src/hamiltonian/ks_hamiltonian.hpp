@@ -42,6 +42,7 @@ public:
 private:
 
 	exchange_operator exchange_;
+	basis::field_set<basis::real_space, double> vxc_;
 	basis::field_set<basis::real_space, PotentialType> scalar_potential_;
 	vector3<double, covariant> uniform_vector_potential_;
 	projector_all projectors_all_;		
@@ -91,6 +92,7 @@ public:
 	ks_hamiltonian(const basis::real_space & basis, ionic::brillouin const & bzone, states::ks_states const & states, atomic_potential const & pot, systems::ions const & ions,
 								 const double exchange_coefficient, bool use_ace = false):
 		exchange_(basis.cell(), bzone, exchange_coefficient, use_ace),
+		vxc_(basis, states.num_density_components()),
 		scalar_potential_(basis, states.num_density_components()),
 		uniform_vector_potential_({0.0, 0.0, 0.0}),
 		states_(states)
@@ -192,6 +194,12 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////
+	
+	auto & projectors_rel() const {
+		return projectors_rel_;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
 
 	template <class output_stream>
 	void info(output_stream & out) const {
@@ -220,6 +228,12 @@ public:
 	}
 	auto & uniform_vector_potential() {
 		return uniform_vector_potential_;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+
+	auto & vxc() const {
+		return vxc_;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////

@@ -25,10 +25,10 @@ inq util match `inq results ground-state energy nvxc`            -6.353978631002
 inq util match `inq results ground-state energy exact-exchange`   0.000000000000  1e-5
 inq util match `inq results ground-state energy ion`             -1.517434464849  1e-5
 
-inq util match `inq results ground-state forces 0` -0.00000000250910 -0.00000000185763  0.14573092924241  3e-5
-inq util match `inq results ground-state forces 1`  0.00000000341961  0.00000000029088 -0.14573050416125  3e-5
+inq util match `inq results ground-state forces 0` -1.17619241701800515970e-08  3.74561683428810830648e-09  1.38894117877148809415e-01  3e-5
+inq util match `inq results ground-state forces 1`  1.47940666596688138219e-08 -2.21046899539461590873e-09 -1.38893781930214815779e-01  3e-5
 #extra check to verify the indiviual component query
-inq util match `inq results ground-state forces 1 z` -0.14573050416125  3e-5
+inq util match `inq results ground-state forces 1 z` -1.38893781930214815779e-01  3e-5
 
 inq real-time time-step 0.025 atu
 inq real-time num-steps 10

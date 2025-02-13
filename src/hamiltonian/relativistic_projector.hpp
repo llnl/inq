@@ -31,7 +31,9 @@ class relativistic_projector {
 	gpu::array<double, 1> kb_coeff_;
 	int iatom_;
 
-public: // for CUDA
+#ifdef ENABLE_GPU
+public:
+#endif
 	
 	void build(basis::real_space const & basis, basis::double_grid const & double_grid, atomic_potential::pseudopotential_type const & ps) {
 
@@ -142,10 +144,10 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
-	template <typename KpointType>
-	gpu::array<complex, 2> project(states::orbital_set<basis::real_space, complex> const & phi, KpointType const & kpoint) const {
+	template <typename Type, typename KpointType>
+	gpu::array<Type, 3> gather(states::orbital_set<basis::real_space, Type> const & phi, KpointType const & kpoint) const {
 
-		gpu::array<complex, 3> sphere_phi({sphere_.size(), phi.local_spinor_set_size(), 2});
+		gpu::array<Type, 3> sphere_phi({sphere_.size(), phi.local_spinor_set_size(), 2});
 
 		gpu::run(phi.local_spinor_set_size(), sphere_.size(),
 						 [gr = begin(phi.spinor_hypercubic()), sph = sphere_.ref(), sgr = begin(sphere_phi), kpoint] GPU_LAMBDA (auto ist, auto ipoint){
@@ -154,6 +156,16 @@ public:
 							 sgr[ipoint][ist][0] = phase*gr[point[0]][point[1]][point[2]][0][ist];
 							 sgr[ipoint][ist][1] = phase*gr[point[0]][point[1]][point[2]][1][ist];
 						 });
+
+		return sphere_phi;
+	}
+	
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	template <typename KpointType>
+	gpu::array<complex, 2> project(states::orbital_set<basis::real_space, complex> const & phi, KpointType const & kpoint) const {
+
+		auto sphere_phi = gather(phi, kpoint);
 
 		gpu::array<complex, 2> projections({nproj_, phi.local_spinor_set_size()});
 
@@ -216,8 +228,37 @@ public:
 							 return real(conj(pp)*pp)*coe[iproj]*occ[ist];
 						 });
 	}
-	
 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	template <typename PhiType, typename GPhiType, typename OccsType, typename KPoint>
+	void force(PhiType & phi, GPhiType const & gphi, OccsType const & occs, KPoint const & kpoint, gpu::array<vector3<double>, 1> & forces_non_local) const {
+
+		auto sphere_gphi = gather(gphi, kpoint);
+		auto projections = project(phi, kpoint);
+
+		gpu::run(phi.local_spinor_set_size(), nproj_,
+						 [proj = begin(projections), coe = begin(kb_coeff_)] GPU_LAMBDA (auto ist, auto iproj) {
+							 proj[iproj][ist] *= coe[iproj];
+						 });
+		
+		auto forc = gpu::run(gpu::reduce(phi.local_spinor_set_size()), gpu::reduce(sphere_.size()), zero<vector3<double, covariant>>(),
+												 [gph = begin(sphere_gphi), oc = begin(occs), nproj = nproj_, bet = begin(beta_), proj = begin(projections)] GPU_LAMBDA (auto ist, auto ip){
+													 auto red0 = complex(0.0, 0.0);
+													 auto red1 = complex(0.0, 0.0);
+													 for(int iproj = 0; iproj < nproj; iproj++) {
+														 auto pp = proj[iproj][ist];
+														 red0 += bet[iproj][ip][0]*pp;
+														 red1 += bet[iproj][ip][1]*pp;
+													 }
+
+													 return -2.0*oc[ist]*(real(red0*conj(gph[ip][ist][0])) + real(red1*conj(gph[ip][ist][1])));
+												 });
+
+		forces_non_local[iatom_] += phi.basis().volume_element()*phi.basis().cell().metric().to_cartesian(forc);
+		
+	}
+	
 	friend class projector_all;
 	
     

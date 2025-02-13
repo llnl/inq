@@ -32,11 +32,11 @@ inq util match `inq results ground-state energy nvxc`              -4.9007783475
 inq util match `inq results ground-state energy exact-exchange`     0.000000000000  3e-5
 inq util match `inq results ground-state energy ion`              -10.318372113231  3e-5
 
-inq util match `inq results ground-state forces 0`                 -0.022483431037  -0.041215997171 -0.052723786483  3e-5
-inq util match `inq results ground-state forces 1`                 -0.022476660700   0.052697035680  0.041207478998  3e-5
-inq util match `inq results ground-state forces 2`                  0.005730135670  -0.012778476335  0.012775275108  3e-5
-inq util match `inq results ground-state forces 3`                  0.007076613283   0.012276399154 -0.012280307956  3e-5
-inq util match `inq results ground-state forces 4`                  0.027652090218  -0.010193515961  0.010356483661  3e-5
+inq util match `inq results ground-state forces 0`                 -2.09878683861885427520e-02 -3.86439030449507309184e-02 -4.92550174029726950398e-02  3e-5
+inq util match `inq results ground-state forces 1`                 -2.09841584974472528113e-02  4.92322743523460754078e-02  3.86387752796131661581e-02  3e-5
+inq util match `inq results ground-state forces 2`                  6.67547441607678308795e-03 -1.28302905479014666551e-02  1.28262908762605074703e-02  3e-5
+inq util match `inq results ground-state forces 3`                  7.67798179337165348501e-03  1.25067841618366794310e-02 -1.25106042421354955035e-02  3e-5
+inq util match `inq results ground-state forces 4`                  2.76562191520605543671e-02 -1.01874661145976881660e-02  1.03629838578964024454e-02  3e-5
 
 inq electrons extra states 0
 inq real-time num-steps 30
@@ -50,3 +50,4 @@ inq util match `inq results real-time total-energy  0`             -9.8023385899
 inq util match `inq results real-time total-energy 10`             -9.80233858990918349718e+00 3e-5
 inq util match `inq results real-time total-energy 20`             -9.80233858990920126075e+00 3e-5
 inq util match `inq results real-time total-energy 30`             -9.80233858990928652588e+00 3e-5
+

@@ -3,13 +3,13 @@
 #ifndef INQ__OPERATIONS__TRANSFORM
 #define INQ__OPERATIONS__TRANSFORM
 
-// Copyright (C) 2019-2023 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
+// Copyright (C) 2019-2025 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include <inq_config.h> //for ENABLE_HEFFTE
+#include <inq_config.h> 
 
 #include <gpu/run.hpp>
 #include <parallel/alltoall.hpp>
@@ -26,10 +26,6 @@
 
 #include <utils/profiling.hpp>
 #include <utils/raw_pointer_cast.hpp>
-
-#ifdef ENABLE_HEFFTE
-#include <heffte.h>
-#endif
 
 #include <cassert>
 
@@ -49,66 +45,6 @@ void zero_outside_sphere(FieldSetType & fphi){
 						 if(point_op.outside_sphere(ix, iy, iz)) fphicub[ix][iy][iz][ist] = zero<typename FieldSetType::element_type>();
 					 });
 }
-
-///////////////////////////////////////////////////////////////
-
-#ifdef ENABLE_HEFFTE
-template <class InArray4D, class OutArray4D>
-void to_fourier_array(basis::real_space const & real_basis, basis::fourier_space const & fourier_basis, InArray4D const & array_rs, OutArray4D && array_fs) {
-
-	CALI_CXX_MARK_FUNCTION;
-
-	assert(get<3>(sizes(array_rs)) == get<3>(sizes(array_fs)));
-	
-	CALI_MARK_BEGIN("heffte_initialization");
- 
-	heffte::box3d<> const rs_box = {{int(real_basis.cubic_part(2).start()), int(real_basis.cubic_part(1).start()), int(real_basis.cubic_part(0).start())},
-																	{int(real_basis.cubic_part(2).end()) - 1, int(real_basis.cubic_part(1).end()) - 1, int(real_basis.cubic_part(0).end()) - 1}};
-	
-	heffte::box3d<> const fs_box = {{int(fourier_basis.cubic_part(2).start()), int(fourier_basis.cubic_part(1).start()), int(fourier_basis.cubic_part(0).start())},
-																	{int(fourier_basis.cubic_part(2).end()) - 1, int(fourier_basis.cubic_part(1).end()) - 1, int(fourier_basis.cubic_part(0).end()) - 1}};
-
-#ifdef ENABLE_CUDA
-	heffte::fft3d<heffte::backend::cufft>
-#else
-	heffte::fft3d<heffte::backend::fftw>
-#endif
-		fft(rs_box, fs_box, real_basis.comm().get());
-
-	CALI_MARK_END("heffte_initialization");
-
-	// we don't need a copy when there is just one field
-	if(size(array_rs[0][0][0]) == 1) {
-		CALI_CXX_MARK_SCOPE("heffte_forward_1");
-		fft.forward((const std::complex<double> *) raw_pointer_cast(array_rs.base()), (std::complex<double> *) raw_pointer_cast(array_fs.base()));
-		return;
-	}
-	
-	gpu::array<complex, 1> input(fft.size_inbox());
-	gpu::prefetch(input);
-	gpu::array<complex, 1> output(fft.size_outbox()); 
-	gpu::prefetch(output);
-
-	for(int ist = 0; ist < size(array_rs[0][0][0]); ist++){
-
-		{
-			CALI_CXX_MARK_SCOPE("heffte_forward_copy_1");
-			input({0, real_basis.local_size()}) = array_rs.flatted().flatted().transposed()[ist];
-		}
-		
-		{
-			CALI_CXX_MARK_SCOPE("heffte_forward");
-			fft.forward((const std::complex<double> *) raw_pointer_cast(input.data_elements()), (std::complex<double> *) raw_pointer_cast(output.data_elements()));
-		}
-		{
-			CALI_CXX_MARK_SCOPE("heffte_forward_copy_2");
-			array_fs.flatted().flatted().transposed()[ist] = output({0, fourier_basis.local_size()});
-		}
-	}
-
-}
-
-#else // no HEFFTE
 
 ///////////////////////////////////////////////////////////////
 
@@ -187,64 +123,6 @@ void to_fourier_array(basis::real_space const & real_basis, basis::fourier_space
 
 	}
 }
-
-#endif
-
-///////////////////////////////////////////////////////////////
-
-#ifdef ENABLE_HEFFTE
-template <class InArray4D, class OutArray4D>
-void to_real_array(basis::fourier_space const & fourier_basis, basis::real_space const & real_basis, InArray4D const & array_fs, OutArray4D && array_rs, bool normalize) {
-
-	CALI_CXX_MARK_FUNCTION;
-
-	CALI_MARK_BEGIN("heffte_initialization");
-	
-	heffte::box3d<> const rs_box = {{int(real_basis.cubic_part(2).start()), int(real_basis.cubic_part(1).start()), int(real_basis.cubic_part(0).start())},
-																	{int(real_basis.cubic_part(2).end()) - 1, int(real_basis.cubic_part(1).end()) - 1, int(real_basis.cubic_part(0).end()) - 1}};
-	
-	heffte::box3d<> const fs_box = {{int(fourier_basis.cubic_part(2).start()), int(fourier_basis.cubic_part(1).start()), int(fourier_basis.cubic_part(0).start())},
-																	{int(fourier_basis.cubic_part(2).end()) - 1, int(fourier_basis.cubic_part(1).end()) - 1, int(fourier_basis.cubic_part(0).end()) - 1}};
-
-#ifdef ENABLE_CUDA
-	heffte::fft3d<heffte::backend::cufft>
-#else
-	heffte::fft3d<heffte::backend::fftw>
-#endif
-		fft(rs_box, fs_box, real_basis.comm().get());
-
-	CALI_MARK_END("heffte_initialization");
-
-	auto scaling = heffte::scale::none;
-	if(normalize) scaling = heffte::scale::full;
-
-	// we don't need a copy when there is just one field
-	if(size(array_rs[0][0][0]) == 1) {
-		CALI_CXX_MARK_SCOPE("heffte_backward_1");
-		fft.backward((const std::complex<double> *) raw_pointer_cast(array_fs.base()), (std::complex<double> *) raw_pointer_cast(array_rs.base()), scaling);
-		return;
-	}
-	
-	gpu::array<complex, 1> input(fft.size_inbox());
-	gpu::prefetch(input); 
-	gpu::array<complex, 1> output(fft.size_outbox()); 
-	gpu::prefetch(output);
-	
-	for(int ist = 0; ist < size(array_rs[0][0][0]); ist++){
-
-		input({0, fourier_basis.local_size()}) = array_fs.flatted().flatted().transposed()[ist];
-		
-		{
-			CALI_CXX_MARK_SCOPE("heffte_backward");
-			fft.backward((const std::complex<double> *) raw_pointer_cast(input.data_elements()), (std::complex<double> *) raw_pointer_cast(output.data_elements()), scaling);
-		}
-
-		array_rs.flatted().flatted().transposed()[ist] = output({0, real_basis.local_size()});
-		
-	}
-}
-	
-#else //NO HEFTTE
 
 ///////////////////////////////////////////////////////////////
 
@@ -332,7 +210,6 @@ void to_real_array(basis::fourier_space const & fourier_basis, basis::real_space
 						 });
 	}
 }
-#endif
 
 ///////////////////////////////////////////////////////////////
 

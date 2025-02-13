@@ -133,7 +133,15 @@ public:
 		
 		// XC
 		double exc, nvxc;
-		xc_(spin_density, core_density_, vks, exc, nvxc);
+		hamiltonian.vxc_ = xc_(spin_density, core_density_, exc, nvxc);
+
+		assert(hamiltonian.vxc_.set_size() == vks.set_size());
+		
+		gpu::run(hamiltonian.vxc_.local_set_size(), hamiltonian.vxc_.basis().local_size(),
+						 [vx = begin(hamiltonian.vxc_.matrix()), vk = begin(vks.matrix())] GPU_LAMBDA (auto is, auto ip){
+							 vk[ip][is] += vx[ip][is];
+						 });
+
 		energy.xc(exc);
 		energy.nvxc(nvxc);
 
