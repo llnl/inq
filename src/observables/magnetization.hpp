@@ -337,7 +337,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons, initial_magnetization);
 		auto mag = observables::total_magnetization(electrons.spin_density());
 		std::vector<vector3<double>> magnetic_centers;
-		for (auto i=0; i<initial_magnetization.size(); i++) magnetic_centers.push_back(ions.positions()[i]);
+		auto nmagc = static_cast<int>(initial_magnetization.size());
+		for (auto i=0; i<nmagc; i++) magnetic_centers.push_back(ions.positions()[i]);
 		auto magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		Approx target = Approx(mag[0]).epsilon(1.e-10);
 		CHECK(magnetic_moments[0][0] == target);
@@ -364,7 +365,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons, initial_magnetization);
 		mag = observables::total_magnetization(electrons.spin_density());
 		magnetic_centers = {};
-		for (auto i=0; i<initial_magnetization.size(); i++) magnetic_centers.push_back(ions.positions()[i]);
+		nmagc = static_cast<int>(initial_magnetization.size());
+		for (auto i=0; i<nmagc; i++) magnetic_centers.push_back(ions.positions()[i]);
 		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
 
