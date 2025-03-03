@@ -39,7 +39,7 @@ GPU_FUNCTION auto local_magnetization(Density const & spin_density, int const & 
 
 ///////////////////////////////////////////////////////////////
 
-auto sdm_oriented(vector3<double> const & mp) {
+auto spin_dens_matr_orient(vector3<double> const & mp) {
 	[[maybe_unused]] constexpr double tol = 1.e-10;
 	assert(norm(mp) <= 1.0+tol);
 
