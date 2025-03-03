@@ -221,16 +221,22 @@ namespace hamiltonian {
 				
 				auto atom_position = ions.positions()[iatom];
 				
-				vector3<double> atomic_magnet = {0.0, 0.0, 0.0};
+				std::array<double, 4> polarization{};
+				polarization[0] = 1.0;
+				
 				if (magnet_dir.size() > 0) {
+					vector3<double> atomic_magnet = {0.0, 0.0, 0.0};
 					atomic_magnet = magnet_dir[iatom];
+					if (nspin > 1) polarization = observables::spin_dens_matr_orient(atomic_magnet);
+				}
+				else {
+					if (nspin > 1) {
+						polarization[0] = 0.6;
+						polarization[1] = 1.0 - polarization[0];
+					}
 				}
 				
 				auto & ps = pseudo_for_element(ions.species(iatom));
-				
-				std::array<double, 4> polarization{};
-				polarization[0] = 1.0;
-				if (nspin > 1) polarization = observables::sdm_oriented(atomic_magnet);
 
 				if(ps.has_electronic_density()){
 					basis::spherical_grid sphere(basis, atom_position, ps.electronic_density_radius());
@@ -472,10 +478,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 		CHECK(nn_pol.set_size() == 2);
 		CHECK(operations::integral_sum(nn_pol) == 29.9562519176_a);
-		CHECK(nn_pol.hypercubic()[5][3][0][0] == Approx(0.066529473));
-		CHECK(nn_pol.hypercubic()[3][1][0][0] == Approx(0.0923002217));
-		CHECK(nn_pol.hypercubic()[5][3][0][1] == Approx(0.066529473));
-		CHECK(nn_pol.hypercubic()[3][1][0][1] == Approx(0.0923002217));
+		CHECK(nn_pol.hypercubic()[5][3][0][0] == Approx(1.2*0.066529473));
+		CHECK(nn_pol.hypercubic()[3][1][0][0] == Approx(1.2*0.0923002217));
+		CHECK(nn_pol.hypercubic()[5][3][0][1] == Approx(0.8*0.066529473));
+		CHECK(nn_pol.hypercubic()[3][1][0][1] == Approx(0.8*0.0923002217));
 		
 		CHECK(pot.has_nlcc());
 		
