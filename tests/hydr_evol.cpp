@@ -19,7 +19,8 @@ int main (int argc, char ** argv){
 
     {
         auto electrons = systems::electrons(env.par(), ions, options::electrons{}.cutoff(30.0_Ha).extra_states(10).spin_non_collinear());
-        ground_state::initial_guess(ions, electrons);
+        std::vector<vector3<double>> initial_magnetization = {{0.0, 0.0, 1.0}};
+        ground_state::initial_guess(ions, electrons, initial_magnetization);
 
         auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-8_Ha).max_steps(1000).mixing(0.1), B);
         auto mag = observables::total_magnetization(electrons.spin_density());
@@ -50,7 +51,8 @@ int main (int argc, char ** argv){
     
     {
         auto electrons = systems::electrons(env.par(), ions, options::electrons{}.cutoff(30.0_Ha).extra_states(10).spin_non_collinear());
-        ground_state::initial_guess(ions, electrons);
+        std::vector<vector3<double>> initial_magnetization = {{0.0, 0.0, 1.0}};
+        ground_state::initial_guess(ions, electrons, initial_magnetization);
 
         auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-8_Ha).max_steps(1000).mixing(0.1), B);
         auto mag = observables::total_magnetization(electrons.spin_density());
