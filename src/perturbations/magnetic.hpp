@@ -92,13 +92,14 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(Approx(fabs(result.energy.zeeman_energy())*27.2114).margin(1.e-4) == 1.0);
 	}
 
-	SECTION("Hydrogen atom perturbation non collinear calculation") {
-		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons);
-		bvec = {0.0_beV, 0.0_beV, 0.1_beV};
-		perturbations::magnetic B(bvec);
-		auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-9_Ha).max_steps(1000).mixing(0.1), B);
-		CHECK(Approx(fabs(result.energy.zeeman_energy())*27.2114).margin(1.e-4) == 0.1);
+    SECTION("Hydrogen atom perturbation non collinear calculation") {
+        auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
+        std::vector<vector3<double>> initial_magnetization = {{0.0, 0.0, 1.0}};
+        ground_state::initial_guess(ions, electrons, initial_magnetization);
+        bvec = {0.0_beV, 0.0_beV, 0.1_beV};
+        perturbations::magnetic B(bvec);
+        auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-9_Ha).max_steps(1000).mixing(0.1), B);
+        CHECK(Approx(fabs(result.energy.zeeman_energy())*27.2114).margin(1.e-4) == 0.1);
 
 		bvec = {0.0_beV, 0.0_beV, 0.5_beV};
 		perturbations::magnetic B2(bvec);
@@ -110,10 +111,12 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-9_Ha).max_steps(1000).mixing(0.1), B3);
 		CHECK(Approx(fabs(result.energy.zeeman_energy())*27.2114).margin(1.e-4) == 1.0);
 
-		bvec = {0.1_beV, 0.0_beV, 0.0_beV};
-		perturbations::magnetic B4(bvec);
-		result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-9_Ha).max_steps(1000).mixing(0.1), B4);
-		CHECK(Approx(fabs(result.energy.zeeman_energy())*27.2114).margin(1.e-4) == 0.1);
-	}
+        bvec = {0.1_beV, 0.0_beV, 0.0_beV};
+        initial_magnetization = {{1.0, 0.0, 0.0}};
+        ground_state::initial_guess(ions, electrons, initial_magnetization);
+        perturbations::magnetic B4(bvec);
+        result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-9_Ha).max_steps(1000).mixing(0.1), B4);
+        CHECK(Approx(fabs(result.energy.zeeman_energy())*27.2114).margin(1.e-4) == 0.1);
+    }
 }
 #endif
