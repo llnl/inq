@@ -11,6 +11,7 @@
 
 #include <basis/field.hpp>
 #include <basis/field_set.hpp>
+#include <operations/spatial_partitions.hpp>
 
 namespace inq {
 namespace observables {
@@ -75,117 +76,46 @@ auto total_magnetization(basis::field_set<basis::real_space, double> const & spi
 	}
 }
 
-template <typename PtType, typename LattType>
-GPU_FUNCTION auto distance_two_grid_points(PtType const & r1, PtType const & r2, int const periodicity, LattType const & lattice) {
-	auto DMAX = sqrt(norm(lattice[0])) + sqrt(norm(lattice[1])) + sqrt(norm(lattice[2]));
-	DMAX = DMAX * 10.0;
-	auto dd = DMAX;
-	if (periodicity == 0) {
-		dd = sqrt(norm(r1 - r2));
-	}
-	else if (periodicity == 1) {
-		auto L1 = lattice[0];
-		for (auto i1 = -1; i1 < 2; i1++) {
-			if (sqrt(norm(r1 - r2 + i1*L1)) < dd) dd = sqrt(norm(r1 - r2 + i1*L1));
-		}
-	}
-	else if (periodicity == 2) {
-		auto L1 = lattice[0];
-		auto L2 = lattice[1];
-		for (auto i1 = -1; i1 < 2; i1++) {
-			for (auto i2 = -1; i2 < 2; i2++) {
-				if (sqrt(norm(r1 - r2 + i1*L1 + i2*L2)) < dd) dd = sqrt(norm(r1 - r2 + i1*L1 + i2*L2));
-			}
-		}
-	}
-	else if (periodicity == 3) {
-		auto L1 = lattice[0];
-		auto L2 = lattice[1];
-		auto L3 = lattice[2];
-		for (auto i1 = -1; i1 < 2; i1++) {
-			for (auto i2 = -1; i2 < 2; i2++) {
-				for (auto i3 = -1; i3 < 2; i3++) {
-					if (sqrt(norm(r1 - r2 + i1*L1 + i2*L2 + i3*L3)) < dd) dd = sqrt(norm(r1 - r2 + i1*L1 + i2*L2 + i3*L3));
-				}
-			}
-		}
-	}
-	return dd;
-}
-
-void integrate_magnet_density(basis::field_set<basis::real_space, vector3<double>> const & local_mag_density, std::vector<vector3<double>> & magnetic_moments) {
-	auto nmagc = static_cast<int>(magnetic_moments.size());
-	basis::field<basis::real_space, vector3<double>> rfield(local_mag_density.basis());
-	for (auto i = 0; i < nmagc; i++) {
-		rfield.fill(vector3<double>{0.0, 0.0, 0.0});
-		gpu::run(local_mag_density.basis().local_size(),
-			[magd = begin(local_mag_density.matrix()), rf = begin(rfield.linear()), index = i] GPU_LAMBDA (auto ip){
-				rf[ip] = magd[ip][index];
-			});
-		magnetic_moments[i] = operations::integral(rfield);
-	}
-}
-
 template <typename CellType>
-void local_magnetic_moments_radii(basis::field_set<basis::real_space, double> const & spin_density, std::vector<double> const & magnetic_radii, std::vector<vector3<double>> const & magnetic_centers, int const periodicity, CellType const & cell, std::vector<vector3<double>> & magnetic_moments) {
+auto compute_local_magnetic_moments_radii(basis::field_set<basis::real_space, double> const & spin_density, std::vector<double> const & magnetic_radii, std::vector<vector3<double, cartesian>> const & magnetic_centers, CellType const & cell) {
 	auto nspin = spin_density.set_size();
 	auto nmagc = static_cast<int>(magnetic_centers.size());
-	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
-	gpu::array<vector3<double>, 1> lattice_ = lattice;
-	gpu::array<vector3<double>, 1> magnetic_centers_ = magnetic_centers;
-	gpu::array<double, 1> magnetic_radii_ = magnetic_radii;
+	auto local_field = inq::operations::local_radii_field(magnetic_centers, magnetic_radii, cell, spin_density.basis());
 	basis::field_set<basis::real_space, vector3<double>> local_mag_density(spin_density.basis(), nmagc);
 	local_mag_density.fill(vector3<double>{0.0, 0.0, 0.0});
-	gpu::run(spin_density.basis().local_sizes()[2], spin_density.basis().local_sizes()[1], spin_density.basis().local_sizes()[0],
-		[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mrs = magnetic_radii_.begin(), mcs = magnetic_centers_.begin(), latt = lattice_.begin(), nspin, nmagc, periodicity] GPU_LAMBDA (auto iz, auto iy, auto ix){
-			auto rr = point_op.rvector_cartesian(ix, iy, iz);
+	gpu::run(spin_density.basis().local_size(),
+		[spd = begin(spin_density.matrix()), magd = begin(local_mag_density.matrix()), ph = begin(local_field.matrix()), nmagc, nspin] GPU_LAMBDA (auto ip){
 			for (auto i = 0; i < nmagc; i++) {
-				auto dd = distance_two_grid_points(rr, mcs[i], periodicity, latt);
-				if (dd <= mrs[i]) magd[ix][iy][iz][i] = local_magnetization(spd[ix][iy][iz], nspin);
+				magd[ip][i] = local_magnetization(spd[ip], nspin)*ph[ip][i];
 			}
 		});
-	integrate_magnet_density(local_mag_density, magnetic_moments);
+	return operations::integral_local(local_mag_density);
 }
 
 template <typename CellType>
-void local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double>> const & magnetic_centers, int const periodicity, CellType const & cell, std::vector<vector3<double>> & magnetic_moments) {
+auto compute_local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double, cartesian>> const & magnetic_centers, CellType const & cell) {
 	auto nspin = spin_density.set_size();
 	auto nmagc = static_cast<int>(magnetic_centers.size());
-	std::array<vector3<double>, 3> lattice = {cell.lattice(0), cell.lattice(1), cell.lattice(2)};
-	gpu::array<vector3<double>, 1> lattice_ = lattice;
-	gpu::array<vector3<double>, 1> magnetic_centers_ = magnetic_centers;
-	auto DMAX = sqrt(norm(lattice[0])) + sqrt(norm(lattice[1])) + sqrt(norm(lattice[2]));
-	DMAX = DMAX * 10.0;
+	auto voronoi = inq::operations::voronoi_field(magnetic_centers, cell, spin_density.basis());
 	basis::field_set<basis::real_space, vector3<double>> local_mag_density(spin_density.basis(), nmagc);
 	local_mag_density.fill(vector3<double>{0.0, 0.0, 0.0});
-	gpu::run(spin_density.basis().local_sizes()[2], spin_density.basis().local_sizes()[1], spin_density.basis().local_sizes()[0],
-		[spd = begin(spin_density.hypercubic()), magd = begin(local_mag_density.hypercubic()), point_op = spin_density.basis().point_op(), mcs = magnetic_centers_.begin(), latt = lattice_.begin(), nspin, nmagc, periodicity, DMAX] GPU_LAMBDA (auto iz, auto iy, auto ix){
-			auto rr = point_op.rvector_cartesian(ix, iy, iz);
-			auto dd2 = DMAX;
-			auto j = -1;
-			for (auto i = 0; i < nmagc; i++) {
-				auto dd = distance_two_grid_points(rr, mcs[i], periodicity, latt);
-				if (dd < dd2) {
-					dd2 = dd;
-					j = i;
-				}
-			}
-			magd[ix][iy][iz][j] = local_magnetization(spd[ix][iy][iz], nspin);
+	gpu::run(spin_density.basis().local_size(),
+		[spd = begin(spin_density.matrix()), magd = begin(local_mag_density.matrix()), vor = begin(voronoi.linear()), nspin] GPU_LAMBDA (auto ip){
+			auto ci = vor[ip];
+			magd[ip][ci] = local_magnetization(spd[ip], nspin);
 		});
-	integrate_magnet_density(local_mag_density, magnetic_moments);
+	return operations::integral_local(local_mag_density);
 }
 
 template <typename CellType>
-auto compute_local_magnetic_moments(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double>> const & magnetic_centers, CellType const & cell, std::vector<double> const & magnetic_radii = {}) {
-	std::vector<vector3<double>> magnetic_moments;
-	auto nmagc = static_cast<int>(magnetic_centers.size());
-	for (auto i = 0; i < nmagc; i++) magnetic_moments.push_back(vector3<double> {0.0, 0.0, 0.0});
+auto compute_local_magnetic_moments(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double,cartesian>> const & magnetic_centers, CellType const & cell, std::vector<double> const & magnetic_radii = {}) {
+	std::vector<vector3<double>> magnetic_moments = {};
 	if (magnetic_radii.empty()) {
-		local_magnetic_moments_voronoi(spin_density, magnetic_centers, cell.periodicity(), cell, magnetic_moments);
+		magnetic_moments = compute_local_magnetic_moments_voronoi(spin_density, magnetic_centers, cell);
 	}
 	else {
 		assert(magnetic_radii.size() == magnetic_centers.size());
-		local_magnetic_moments_radii(spin_density, magnetic_radii, magnetic_centers, cell.periodicity(), cell, magnetic_moments);
+		magnetic_moments = compute_local_magnetic_moments_radii(spin_density, magnetic_radii, magnetic_centers, cell);
 	}
 	return magnetic_moments;
 }
@@ -224,9 +154,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 		ground_state::initial_guess(ions, electrons, initial_magnetization);
 		auto mag = observables::total_magnetization(electrons.spin_density());
-		std::vector<vector3<double>> magnetic_centers;
-		auto nmagc = static_cast<int>(initial_magnetization.size());
-		for (auto i=0; i<nmagc; i++) magnetic_centers.push_back(ions.positions()[i]);
+		std::vector<vector3<double,cartesian>> magnetic_centers = {ions.positions()[0]};
 		auto magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		Approx target = Approx(mag[2]).epsilon(1.e-10);
 		CHECK(magnetic_moments[0][2] == target);
@@ -252,9 +180,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		};
 		ground_state::initial_guess(ions, electrons, initial_magnetization);
 		mag = observables::total_magnetization(electrons.spin_density());
-		magnetic_centers = {};
-		nmagc = static_cast<int>(initial_magnetization.size());
-		for (auto i=0; i<nmagc; i++) magnetic_centers.push_back(ions.positions()[i]);
+		magnetic_centers = {ions.positions()[0], ions.positions()[1]};
 		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
 
@@ -280,9 +206,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 		ground_state::initial_guess(ions, electrons, initial_magnetization);
 		auto mag = observables::total_magnetization(electrons.spin_density());
-		std::vector<vector3<double>> magnetic_centers;
-		auto nmagc = static_cast<int>(initial_magnetization.size());
-		for (auto i=0; i<nmagc; i++) magnetic_centers.push_back(ions.positions()[i]);
+		std::vector<vector3<double, cartesian>> magnetic_centers;
+		magnetic_centers = {ions.positions()[0]};
 		auto magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		Approx target = Approx(mag[0]).epsilon(1.e-10);
 		CHECK(magnetic_moments[0][0] == target);
@@ -308,9 +233,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		};
 		ground_state::initial_guess(ions, electrons, initial_magnetization);
 		mag = observables::total_magnetization(electrons.spin_density());
-		magnetic_centers = {};
-		nmagc = static_cast<int>(initial_magnetization.size());
-		for (auto i=0; i<nmagc; i++) magnetic_centers.push_back(ions.positions()[i]);
+		magnetic_centers = {ions.positions()[0], ions.positions()[1]};
 		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
 
@@ -322,6 +245,11 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		mag = observables::total_magnetization(electrons.spin_density());
 		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
+		
+		std::vector<double> magnetic_radii = {1.0, 1.0};
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
+		CHECK(Approx(magnetic_moments[0][2]).margin(1.e-7) == 4.4085);
+		CHECK(Approx(magnetic_moments[1][2]).margin(1.e-7) == 5.18108);
 	}
 
 }
