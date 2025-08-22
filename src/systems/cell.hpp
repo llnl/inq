@@ -221,6 +221,13 @@ namespace systems {
 				return (rlat_[0]*vv[0] + rlat_[1]*vv[1] + rlat_[2]*vv[2]);
 			}
 			
+			template <class Type, class Space>
+			GPU_FUNCTION auto distance(vector3<Type, Space> const & vv1, vector3<Type, Space> const & vv2) const {
+				auto vv1_ = to_cartesian(vv1);
+				auto vv2_ = to_cartesian(vv2);
+				return length(vv1_ - vv2_);
+			}
+			
 		};
 
 		auto metric() const {
