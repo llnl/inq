@@ -77,7 +77,7 @@ auto total_magnetization(basis::field_set<basis::real_space, double> const & spi
 }
 
 template <typename CellType>
-auto compute_local_magnetic_moments_radii(basis::field_set<basis::real_space, double> const & spin_density, std::vector<double> const & magnetic_radii, std::vector<vector3<double, cartesian>> const & magnetic_centers, CellType const & cell) {
+std::vector<vector3<double>> compute_local_magnetic_moments_radii(basis::field_set<basis::real_space, double> const & spin_density, std::vector<double> const & magnetic_radii, std::vector<vector3<double, cartesian>> const & magnetic_centers, CellType const & cell) {
 	auto nspin = spin_density.set_size();
 	auto nmagc = static_cast<int>(magnetic_centers.size());
 	auto local_field = inq::operations::local_radii_field(magnetic_centers, magnetic_radii, cell, spin_density.basis());
@@ -93,7 +93,7 @@ auto compute_local_magnetic_moments_radii(basis::field_set<basis::real_space, do
 }
 
 template <typename CellType>
-auto compute_local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double, cartesian>> const & magnetic_centers, CellType const & cell) {
+std::vector<vector3<double>> compute_local_magnetic_moments_voronoi(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double, cartesian>> const & magnetic_centers, CellType const & cell) {
 	auto nspin = spin_density.set_size();
 	auto nmagc = static_cast<int>(magnetic_centers.size());
 	auto voronoi = inq::operations::voronoi_field(magnetic_centers, cell, spin_density.basis());
@@ -108,7 +108,7 @@ auto compute_local_magnetic_moments_voronoi(basis::field_set<basis::real_space, 
 }
 
 template <typename CellType>
-auto compute_local_magnetic_moments(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double,cartesian>> const & magnetic_centers, CellType const & cell, std::vector<double> const & magnetic_radii = {}) {
+std::vector<vector3<double>> compute_local_magnetic_moments(basis::field_set<basis::real_space, double> const & spin_density, std::vector<vector3<double,cartesian>> const & magnetic_centers, CellType const & cell, std::vector<double> const & magnetic_radii = {}) {
 	std::vector<vector3<double>> magnetic_moments = {};
 	if (magnetic_radii.empty()) {
 		magnetic_moments = compute_local_magnetic_moments_voronoi(spin_density, magnetic_centers, cell);
