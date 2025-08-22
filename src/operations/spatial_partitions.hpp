@@ -11,7 +11,7 @@ namespace inq {
 namespace operations {
 
 template <typename CellType>
-auto voronoi_field(std::vector<vector3<double, cartesian>> const & local_centers, CellType const & cell, basis::real_space const & bas) {
+basis::field<basis::real_space, int> voronoi_field(std::vector<vector3<double, cartesian>> const & local_centers, CellType const & cell, basis::real_space const & bas) {
     auto nloc = static_cast<int>(local_centers.size());
     assert(nloc > 0);
 
@@ -46,7 +46,7 @@ auto voronoi_field(std::vector<vector3<double, cartesian>> const & local_centers
 }
 
 template <typename CellType>
-auto local_radii_field(std::vector<vector3<double, cartesian>> const & local_centers, std::vector<double> const & local_radii, CellType const & cell, basis::real_space const & bas){
+basis::field_set<basis::real_space, int> local_radii_field(std::vector<vector3<double, cartesian>> const & local_centers, std::vector<double> const & local_radii, CellType const & cell, basis::real_space const & bas){
     auto nloc = static_cast<int>(local_centers.size());
     assert(nloc == local_radii.size());
 
