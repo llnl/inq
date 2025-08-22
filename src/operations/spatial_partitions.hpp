@@ -27,16 +27,16 @@ auto voronoi_field(std::vector<vector3<double, cartesian>> const & local_centers
             auto rr = point_op.rvector_cartesian(ix, iy, iz);
             auto ci = -1;
             auto dd = DBL_MAX;
-            for (auto i = 0; i < nloc; i++) {
-                auto pr = inq::ionic::periodic_replicas(cell, rc[i], range);
+            for (auto ii = 0; ii < nloc; ii++) {
+                auto rep = inq::ionic::periodic_replicas(cell, rc[ii], range);
                 auto dd2 = DBL_MAX;
-                for (auto r = 0; r < pr.size(); r++) {
-                    auto dd3 = cell.metric().distance(rr, pr[r]);
+                for (unsigned irep = 0; irep < rep.size(); irep++) {
+                    auto dd3 = cell.metric().distance(rr, rep[irep]);
                     if (dd3 < dd2) dd2 = dd3;
                 }
                 if (dd2 < dd) {
                     dd = dd2;
-                    ci = i;
+                    ci = ii;
                 }
             }
             ph[ix][iy][iz] = ci;
@@ -61,10 +61,10 @@ auto local_radii_field(std::vector<vector3<double, cartesian>> const & local_cen
         [ph = begin(local_field.hypercubic()), point_op = bas.point_op(), rc = local_centers.begin(), rd = local_radii.begin(), nloc, range, cell] GPU_LAMBDA (auto iz, auto iy, auto ix){
             auto rr = point_op.rvector_cartesian(ix, iy, iz);
             for (auto ii = 0; ii < nloc; ii++) {
-                auto replicas = inq::ionic::periodic_replicas(cell, rc[ii], range);
+                auto rep = inq::ionic::periodic_replicas(cell, rc[ii], range);
                 auto dd = DBL_MAX;
-                for (auto pr = 0; pr < replicas.size(); pr++) {
-                    auto dd2 = cell.metric().distance(rr, replicas[pr]);
+                for (unsigned irep = 0; irep < rep.size(); irep++) {
+                    auto dd2 = cell.metric().distance(rr, rep[irep]);
                     if (dd2 < dd) dd = dd2;
                 }
                 if (dd < rd[ii]) ph[ix][iy][iz][ii] = 1;
