@@ -223,9 +223,7 @@ namespace systems {
 			
 			template <class Type, class Space>
 			GPU_FUNCTION auto distance(vector3<Type, Space> const & vv1, vector3<Type, Space> const & vv2) const {
-				auto vv1_ = to_cartesian(vv1);
-				auto vv2_ = to_cartesian(vv2);
-				return length(vv1_ - vv2_);
+				return length(to_cartesian(vv1) - to_cartesian(vv2));
 			}
 			
 		};
