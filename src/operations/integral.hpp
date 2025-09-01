@@ -152,12 +152,12 @@ std::vector<ElementType> integral_local(basis::field_set<BasisType, ElementType>
 	auto n = phi.set_size();
 	std::vector<ElementType> integral_set(n);
 	for (auto i = 0; i < n; i++){
-		basis::field<BasisType, ElementType> phi_loc(phi.basis());
+		gpu::array<ElementType, 1> phi_loc(phi.basis().local_size());
 		gpu::run(phi.basis().local_size(),
-			[ph = begin(phi.matrix()), phl = begin(phi_loc.linear()), index = i] GPU_LAMBDA (auto ip){
+			[ph = begin(phi.matrix()), phl = begin(phi_loc), index = i] GPU_LAMBDA (auto ip){
 				phl[ip] = ph[ip][index];
 			});
-		auto integral_value = phi_loc.basis().volume_element()*sum(phi_loc.linear());
+		auto integral_value = phi.basis().volume_element()*sum(phi_loc);
 		if (phi.full_comm().size() > 1) phi.full_comm().all_reduce_in_place_n(&integral_value, 1, std::plus<>{});
 		integral_set[i] = integral_value;
 	}
