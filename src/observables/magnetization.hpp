@@ -250,6 +250,32 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
 		CHECK(Approx(magnetic_moments[0][2]).margin(1.e-7) == 4.4085);
 		CHECK(Approx(magnetic_moments[1][2]).margin(1.e-7) == 5.18108);
+
+		initial_magnetization = {
+			{0.5, 0.0, 0.0}, 
+			{0.5, 0.0, 0.0}
+		};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		CHECK(Approx(magnetic_moments[0][0] + magnetic_moments[1][0]).margin(1.e-7) == mag[0]);
+		
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
+		CHECK(Approx(magnetic_moments[0][0]).margin(1.e-7) == 4.4085);
+		CHECK(Approx(magnetic_moments[1][0]).margin(1.e-7) == 5.18108);
+
+		initial_magnetization = {
+			{0.0, 0.5, 0.0}, 
+			{0.0, 0.5, 0.0}
+		};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
+		mag = observables::total_magnetization(electrons.spin_density());
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
+		CHECK(Approx(magnetic_moments[0][1] + magnetic_moments[1][1]).margin(1.e-7) == mag[1]);
+		
+		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
+		CHECK(Approx(magnetic_moments[0][1]).margin(1.e-7) == 4.4085);
+		CHECK(Approx(magnetic_moments[1][1]).margin(1.e-7) == 5.18108);
 	}
 
 }
