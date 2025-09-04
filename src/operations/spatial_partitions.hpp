@@ -22,26 +22,36 @@ basis::field<basis::real_space, int> voronoi_field(std::vector<vector3<double, c
         auto L = sqrt(norm(cell[idir]));
         if (L > range) range = L;
     }
-    std::vector<std::vector<vector3<double>>> replicas;
+    
+    gpu::array<int, 1> num_rep(nloc);
+    auto nn = 0;
     for (auto ii = 0; ii < nloc; ii++) {
         auto rep = inq::ionic::periodic_replicas(cell, local_centers[ii], range);
-        std::vector<vector3<double>> rep_;
+        num_rep[ii] = rep.size();
+        nn += num_rep[ii];
+    }
+    gpu::array<vector3<double>, 1> replicas(nn);
+    auto ir = 0;
+    for (auto ii = 0; ii < nloc; ii++) {
+        auto rep = inq::ionic::periodic_replicas(cell, local_centers[ii], range);
         for (unsigned irep = 0; irep < rep.size(); irep++) {
-            rep_.push_back(rep[irep]);
+            replicas[ir] = rep[irep];
+            ir++;
         }
-        replicas.push_back(rep_);
     }
 
     gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
-        [ph = begin(local_field.cubic()), point_op = bas.point_op(), rep = replicas.begin(), nloc, cell] GPU_LAMBDA (auto iz, auto iy, auto ix){
+        [ph = begin(local_field.cubic()), point_op = bas.point_op(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, cell] GPU_LAMBDA (auto iz, auto iy, auto ix){
             auto rr = point_op.rvector_cartesian(ix, iy, iz);
             auto ci = -1;
             auto dd = DBL_MAX;
+            auto ir = 0;
             for (auto ii = 0; ii < nloc; ii++) {
                 auto dd2 = DBL_MAX;
-                for (auto irep = 0; irep < rep[ii].size(); irep++) {
-                    auto dd3 = cell.metric().distance(rr, rep[ii][irep]);
+                for (auto irep = 0; irep < nrep[ii]; irep++) {
+                    auto dd3 = cell.metric().distance(rr, rep[ir]);
                     if (dd3 < dd2) dd2 = dd3;
+                    ir++;
                 }
                 if (dd2 < dd) {
                     dd = dd2;
@@ -66,24 +76,34 @@ basis::field_set<basis::real_space, int> local_radii_field(std::vector<vector3<d
         auto L = sqrt(norm(cell[idir]));
         if (L > range) range = L;
     }
-    std::vector<std::vector<vector3<double>>> replicas;
+    
+    gpu::array<int, 1> num_rep(nloc);
+    auto nn = 0;
     for (auto ii = 0; ii < nloc; ii++) {
         auto rep = inq::ionic::periodic_replicas(cell, local_centers[ii], range);
-        std::vector<vector3<double>> rep_;
+        num_rep[ii] = rep.size();
+        nn += num_rep[ii];
+    }
+    gpu::array<vector3<double>, 1> replicas(nn);
+    auto ir = 0;
+    for (auto ii = 0; ii < nloc; ii++) {
+        auto rep = inq::ionic::periodic_replicas(cell, local_centers[ii], range);
         for (unsigned irep = 0; irep < rep.size(); irep++) {
-            rep_.push_back(rep[irep]);
+            replicas[ir] = rep[irep];
+            ir++;
         }
-        replicas.push_back(rep_);
     }
 
     gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
-        [ph = begin(local_field.hypercubic()), point_op = bas.point_op(), rd = local_radii.begin(), rep = replicas.begin(), nloc, cell] GPU_LAMBDA (auto iz, auto iy, auto ix){
+        [ph = begin(local_field.hypercubic()), point_op = bas.point_op(), rd = local_radii.begin(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, cell] GPU_LAMBDA (auto iz, auto iy, auto ix){
             auto rr = point_op.rvector_cartesian(ix, iy, iz);
+            auto ir = 0;
             for (auto ii = 0; ii < nloc; ii++) {
                 auto dd = DBL_MAX;
-                for (auto irep = 0; irep < rep[ii].size(); irep++) {
-                    auto dd2 = cell.metric().distance(rr, rep[ii][irep]);
+                for (auto irep = 0; irep < nrep[ii]; irep++) {
+                    auto dd2 = cell.metric().distance(rr, rep[ir]);
                     if (dd2 < dd) dd = dd2;
+                    ir++;
                 }
                 if (dd < rd[ii]) ph[ix][iy][iz][ii] = 1;
             }
