@@ -41,7 +41,7 @@ basis::field<basis::real_space, int> voronoi_field(std::vector<vector3<double, c
     }
 
     gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
-        [ph = begin(local_field.cubic()), point_op = bas.point_op(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, cell] GPU_LAMBDA (auto iz, auto iy, auto ix){
+        [ph = begin(local_field.cubic()), point_op = bas.point_op(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, metric_op = cell.metric()] GPU_LAMBDA (auto iz, auto iy, auto ix){
             auto rr = point_op.rvector_cartesian(ix, iy, iz);
             auto ci = -1;
             auto dd = DBL_MAX;
@@ -49,7 +49,7 @@ basis::field<basis::real_space, int> voronoi_field(std::vector<vector3<double, c
             for (auto ii = 0; ii < nloc; ii++) {
                 auto dd2 = DBL_MAX;
                 for (auto irep = 0; irep < nrep[ii]; irep++) {
-                    auto dd3 = cell.metric().distance(rr, rep[ir]);
+                    auto dd3 = metric_op.distance(rr, rep[ir]);
                     if (dd3 < dd2) dd2 = dd3;
                     ir++;
                 }
@@ -95,13 +95,13 @@ basis::field_set<basis::real_space, int> local_radii_field(std::vector<vector3<d
     }
 
     gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
-        [ph = begin(local_field.hypercubic()), point_op = bas.point_op(), rd = local_radii.begin(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, cell] GPU_LAMBDA (auto iz, auto iy, auto ix){
+        [ph = begin(local_field.hypercubic()), point_op = bas.point_op(), rd = local_radii.begin(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, metric_op = cell.metric()] GPU_LAMBDA (auto iz, auto iy, auto ix){
             auto rr = point_op.rvector_cartesian(ix, iy, iz);
             auto ir = 0;
             for (auto ii = 0; ii < nloc; ii++) {
                 auto dd = DBL_MAX;
                 for (auto irep = 0; irep < nrep[ii]; irep++) {
-                    auto dd2 = cell.metric().distance(rr, rep[ir]);
+                    auto dd2 = metric_op.distance(rr, rep[ir]);
                     if (dd2 < dd) dd = dd2;
                     ir++;
                 }
