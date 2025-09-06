@@ -93,9 +93,11 @@ basis::field_set<basis::real_space, int> local_radii_field(std::vector<vector3<d
             ir++;
         }
     }
+    gpu::array<double, 1> radii(nloc);
+    for (auto ii = 0; ii < nloc; ii++) radii[ii] = local_radii[ii];
 
     gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
-        [ph = begin(local_field.hypercubic()), point_op = bas.point_op(), rd = local_radii.begin(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, metric_op = cell.metric()] GPU_LAMBDA (auto iz, auto iy, auto ix){
+        [ph = begin(local_field.hypercubic()), point_op = bas.point_op(), rd = radii.begin(), nrep = num_rep.begin(), rep = replicas.begin(), nloc, metric_op = cell.metric()] GPU_LAMBDA (auto iz, auto iy, auto ix){
             auto rr = point_op.rvector_cartesian(ix, iy, iz);
             auto ir = 0;
             for (auto ii = 0; ii < nloc; ii++) {
