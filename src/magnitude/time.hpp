@@ -3,7 +3,7 @@
 #ifndef INQ__MAGNITUDE__TIME
 #define INQ__MAGNITUDE__TIME
 
-// Copyright (C) 2019-2023 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
+// Copyright (C) 2019-2025 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -17,19 +17,19 @@ namespace magnitude {
 
 struct time;
 
-auto operator "" _atomictime(long double val){
+auto operator ""_atomictime(long double val){
 	return inq::quantity<time>::from_atomic_units(val);
 }
 
-auto operator "" _atomictimeunits(long double val){
+auto operator ""_atomictimeunits(long double val){
 	return inq::quantity<time>::from_atomic_units(val);
 }
 
-auto operator "" _atu(long double val){
+auto operator ""_atu(long double val){
 	return inq::quantity<time>::from_atomic_units(val);
 }
 
-auto operator "" _attosecond(long double val){
+auto operator ""_attosecond(long double val){
 	return inq::quantity<time>::from_atomic_units(0.0413413733352975*val);
 }
 

@@ -18,55 +18,55 @@ namespace magnitude {
 
 struct energy;
 
-auto operator "" _ha(long double val){
+auto operator ""_ha(long double val){
 	return inq::quantity<energy>::from_atomic_units(val);
 }
 
-auto operator "" _Ha(long double val){
+auto operator ""_Ha(long double val){
 	return inq::quantity<energy>::from_atomic_units(val);
 }
 	
-auto operator "" _hartree(long double val){
+auto operator ""_hartree(long double val){
 	return inq::quantity<energy>::from_atomic_units(val);
 }
 
-auto operator "" _ev(long double val){
+auto operator ""_ev(long double val){
 	return inq::quantity<energy>::from_atomic_units(0.0367493221756544*val);
 }
 
-auto operator "" _eV(long double val){
+auto operator ""_eV(long double val){
 	return val*1.0_ev;
 }
 	
-auto operator "" _electronvolt(long double val){
+auto operator ""_electronvolt(long double val){
 	return val*1.0_ev;
 }
 
-auto operator "" _ry(long double val){
+auto operator ""_ry(long double val){
 	return inq::quantity<energy>::from_atomic_units(0.5*val);
 }
 
-auto operator "" _rydberg(long double val){
+auto operator ""_rydberg(long double val){
 	return val*1.0_ry;
 }
 
-auto operator "" _Ry(long double val){
+auto operator ""_Ry(long double val){
 	return val*1.0_ry;
 }
 	
-auto operator "" _K(long double val){
+auto operator ""_K(long double val){
 	return inq::quantity<energy>::from_atomic_units(3.16681156345556e-06*val);	
 }
 	
-auto operator "" _kelvin(long double val){
+auto operator ""_kelvin(long double val){
 	return val*1.0_K;
 }
 	
-auto operator "" _THz(long double val){
+auto operator ""_THz(long double val){
 	return inq::quantity<energy>::from_atomic_units(0.000151982850071586*val);	
 }
 
-auto operator "" _terahertz(long double val){
+auto operator ""_terahertz(long double val){
 	return val*1.0_THz;
 }
 

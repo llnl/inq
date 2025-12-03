@@ -10,23 +10,23 @@ namespace magnitude {
 
 struct magfield;
 
-auto operator "" _amu(long double val){
+auto operator ""_amu(long double val){
     return inq::quantity<magfield>::from_atomic_units(val);
 }
 
-auto operator "" _AMU(long double val){
+auto operator ""_AMU(long double val){
     return inq::quantity<magfield>::from_atomic_units(val);
 }
 
-auto operator "" _tesla(long double val){
+auto operator ""_tesla(long double val){
     return inq::quantity<magfield>::from_atomic_units(val/2.3505e+05);
 }
 
-auto operator "" _T(long double val){
+auto operator ""_T(long double val){
     return inq::quantity<magfield>::from_atomic_units(val/2.3505e+05);
 }
 
-auto operator "" _beV(long double val){
+auto operator ""_beV(long double val){
     auto muB = 5.7883818060E-5;     // eV T^-1
     auto ge = 2.00231930436256;
     auto val2 = 2.0*val/(ge*muB);
