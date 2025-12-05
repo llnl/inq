@@ -30,7 +30,6 @@ double steepest_descent(const operator_type & ham, const preconditioner_type & p
 	const int num_steps = 5;
 
 	auto mm = gpu::array<typename field_set_type::element_type, 2>({3, phi.local_set_size()});
-	auto lambda = gpu::array<typename field_set_type::element_type, 1>(phi.local_set_size());
 	auto normres = gpu::array<double, 1>(phi.local_set_size());
 
 	auto residual = ham(phi);
@@ -40,32 +39,31 @@ double steepest_descent(const operator_type & ham, const preconditioner_type & p
     
 		//calculate the residual
 			
-    auto sd = residual;
-		prec(sd);
-		auto hsd = ham(sd);
+    auto searchdir = residual;
+		prec(searchdir);
+		auto hsearchdir = ham(searchdir);
       
-		mm[0] = operations::overlap_diagonal(hsd, hsd);
-		mm[1] = operations::overlap_diagonal(residual, hsd);
+		mm[0] = operations::overlap_diagonal(hsearchdir, hsearchdir);
+		mm[1] = operations::overlap_diagonal(residual, hsearchdir);
 		mm[2] = operations::overlap_diagonal(residual, residual);
 
-		gpu::run(phi.local_set_size(),
-						 [m = begin(mm), lam = begin(lambda), nor = begin(normres)] GPU_LAMBDA (auto ist){
+		gpu::run(phi.local_set_size(), phi.basis().local_size(),
+						 [m = begin(mm), nor = begin(normres), ph = begin(phi.matrix()), sea = begin(searchdir.matrix()), hsea = begin(hsearchdir.matrix()), res = begin(residual.matrix())] GPU_LAMBDA (auto ist, auto ip){
 							 auto ca = m[0][ist];
 							 auto cb = 4.0*real(m[1][ist]);
 							 auto cc = m[2][ist];
 
-							 nor[ist] = fabs(cc);
+							 if(ip == 0) nor[ist] = fabs(cc);
 
 							 auto sqarg = cb*cb - 4.0*ca*cc;
 							 auto signb = (real(conj(cb)*sqarg) >= 0)?1.0:-1.0;
 
 							 auto qq = -0.5*(cb + signb*sqrt(sqarg));
-							 lam[ist] = cc/qq;
+							 auto lambda = cc/qq;
 
+							 ph[ip][ist]  += lambda*sea[ip][ist];
+							 res[ip][ist] += lambda*hsea[ip][ist];
 						 });
-		
-		operations::shift(1.0, lambda, sd, phi);
-		operations::shift(1.0, lambda, hsd, residual);
 	}
 
 	auto maxloc =
