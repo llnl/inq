@@ -43,7 +43,8 @@ void crank_nicolson(double const time, double const dt, systems::ions & ions, sy
 	assert(not sc.has_induced_vector_potential());
 	
 	CALI_CXX_MARK_FUNCTION;
-	
+
+	operations::preconditioner prec;
 	crank_nicolson_op<decltype(ham)> op{ham, complex{0.0, 0.5*dt}};
 	crank_nicolson_op<decltype(ham)> op_rhs{ham, complex{0.0, -0.5*dt}};
 
@@ -89,7 +90,7 @@ void crank_nicolson(double const time, double const dt, systems::ions & ions, sy
 		auto res = 0.0;
 		auto iphi = 0;
 		for(auto & phi : electrons.kpin()){
-			auto ires = solvers::steepest_descent(op, operations::no_preconditioner{}, rhs[iphi], phi);
+			auto ires = solvers::steepest_descent(op, prec, rhs[iphi], phi);
 			res += ires*electrons.kpin_weights()[iphi];
 			iphi++;
 		}
