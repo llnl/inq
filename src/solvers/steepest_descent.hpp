@@ -33,13 +33,13 @@ double steepest_descent(const operator_type & ham, const preconditioner_type & p
 	auto lambda = gpu::array<typename field_set_type::element_type, 1>(phi.local_set_size());
 	auto normres = gpu::array<double, 1>(phi.local_set_size());
 
+	auto residual = ham(phi);
+	operations::shift(-1.0, rhs, residual);
+
 	for(int istep = 0; istep < num_steps; istep++){
     
 		//calculate the residual
 			
-		auto residual = ham(phi);
-    operations::shift(-1.0, rhs, residual);
-
     auto sd = residual;
 		prec(sd);
 		auto hsd = ham(sd);
@@ -48,17 +48,6 @@ double steepest_descent(const operator_type & ham, const preconditioner_type & p
 		mm[1] = operations::overlap_diagonal(residual, hsd);
 		mm[2] = operations::overlap_diagonal(residual, residual);
 
-		/*
-		//Debugging output
-		boost::mpi3::ostream wout(phi.set_comm());
-		
-		wout << istep << std::flush;
-		for(int ist = 0; ist < phi.local_set_size(); ist++){
-			wout << '\t' << fabs(mm[2][ist]) << std::flush;
-		}
-		wout << std::endl;
-		*/
-		
 		gpu::run(phi.local_set_size(),
 						 [m = begin(mm), lam = begin(lambda), nor = begin(normres)] GPU_LAMBDA (auto ist){
 							 auto ca = m[0][ist];
@@ -75,7 +64,8 @@ double steepest_descent(const operator_type & ham, const preconditioner_type & p
 
 						 });
 		
-		operations::shift(1.0, lambda, residual, phi);
+		operations::shift(1.0, lambda, sd, phi);
+		operations::shift(1.0, lambda, hsd, residual);
 	}
 
 	auto maxloc =
