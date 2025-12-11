@@ -103,7 +103,7 @@ basis::field_set<basis::real_space, double> calculate(ElecType & elec){
 ///////////////////////////////////////////////////////////////
 
 template <class FieldType>
-void normalize(FieldType & density, const double & total_charge){
+auto normalize(FieldType & density, const double & total_charge) -> typename FieldType::element_type {
 
 	CALI_CXX_MARK_FUNCTION;
 	
@@ -115,6 +115,7 @@ void normalize(FieldType & density, const double & total_charge){
 					 [den = begin(density.matrix()), factor = total_charge/qq] GPU_LAMBDA (auto ist, auto ip){ 
 						 den[ip][ist] *= factor;
 					 });
+	return qq;
 }
 
 ///////////////////////////////////////////////////////////////
