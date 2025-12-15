@@ -18,6 +18,12 @@
 #include <utils/profiling.hpp>
 #include <utils/raw_pointer_cast.hpp>
 
+#ifdef ENABLE_HIP
+#define CUBLAS_OP_N HIPBLAS_OP_N
+#define CUBLAS_OP_T HIPBLAS_OP_T
+#define cublasDgemmStridedBatched hipblasDgemmStridedBatched
+#endif
+
 namespace inq {
 namespace hamiltonian {
 
@@ -139,7 +145,7 @@ public:
 		auto sphere_phi_all = gather(phi, kpoint);
 		gpu::array<complex, 3> projections_all({nprojs_, max_nlm_, phi.local_set_size()}, 0.0);
 		
-#ifndef ENABLE_CUDA
+#ifndef ENABLE_GPU
 		for(auto iproj = 0; iproj < nprojs_; iproj++){
 			CALI_CXX_MARK_SCOPE("projector_gemm_1");
 
@@ -225,7 +231,7 @@ public:
 		
 		gpu::array<complex, 3> sphere_phi_all({nprojs_, max_sphere_size_, phi.local_set_size()});
 		
-#ifndef ENABLE_CUDA
+#ifndef ENABLE_GPU
 		for(auto iproj = 0; iproj < nprojs_; iproj++) {
 			CALI_CXX_MARK_SCOPE("projector_gemm_2");
 
