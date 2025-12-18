@@ -26,7 +26,7 @@ if [ -n "$MPI_LOCALRANKID" ]; then
     rank=$MPI_LOCALRANKID
 fi
 
-igpu=$(($rank%$ngpu))
+igpu=$((($rank + $RANDOM)%$ngpu))
 
 if [ -z "${CUDA_VISIBLE_DEVICES}" ]; then
   export CUDA_VISIBLE_DEVICES=$igpu

@@ -514,9 +514,9 @@ cuda-mpich-fast-1proc:
       - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libopenmpi-dev openmpi-bin libboost-system-dev libboost-serialization-dev libhdf5-dev libhdf5-openmpi-dev valgrind libmpich-dev mpich libhdf5-dev libhdf5-mpich-dev wget python3 python3-dev ase
       - time tar -Ipixz -xvf cuda-mpich-fast-build.tar.xz
       - export GPUBIND=`pwd`/scripts/gpubind
-      - export CUDA_VISIBLE_DEVICES=0,1
+      - export CUDA_VISIBLE_DEVICES=2
       - cd build      
-      - INQ_EXEC_ENV="mpirun.mpich -np 1 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
+      - INQ_EXEC_ENV="mpirun.mpich -np 1 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 cuda-mpich-fast-2proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -531,8 +531,8 @@ cuda-mpich-fast-2proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build      
-      - INQ_EXEC_ENV="mpirun.mpich -np 2 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
-
+      - INQ_EXEC_ENV="mpirun.mpich -np 2 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
+      
 cuda-mpich-fast-4proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
     stage: gpu-test
@@ -546,7 +546,7 @@ cuda-mpich-fast-4proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build      
-      - INQ_EXEC_ENV="mpirun.mpich -np 4 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
+      - INQ_EXEC_ENV="mpirun.mpich -np 4 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 cuda-mpich-fast-5proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -561,7 +561,7 @@ cuda-mpich-fast-5proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build      
-      - INQ_EXEC_ENV="mpirun.mpich -np 5 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
+      - INQ_EXEC_ENV="mpirun.mpich -np 5 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 #########################################################################################################################
 # NVIDIA MPICH DEBUG
@@ -603,9 +603,9 @@ cuda-mpich-debug-1proc:
       - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libopenmpi-dev openmpi-bin libboost-system-dev libboost-serialization-dev libhdf5-dev libhdf5-openmpi-dev valgrind libmpich-dev mpich libhdf5-dev libhdf5-mpich-dev wget python3 python3-dev ase
       - time tar -Ipixz -xvf cuda-mpich-debug-build.tar.xz
       - export GPUBIND=`pwd`/scripts/gpubind
-      - export CUDA_VISIBLE_DEVICES=0,1      
+      - export CUDA_VISIBLE_DEVICES=2
       - cd build
-      - INQ_EXEC_ENV="mpirun.mpich -np 1 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
+      - INQ_EXEC_ENV="mpirun.mpich -np 1 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 cuda-mpich-debug-2proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -620,7 +620,7 @@ cuda-mpich-debug-2proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build
-      - INQ_EXEC_ENV="mpirun.mpich -np 2 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
+      - INQ_EXEC_ENV="mpirun.mpich -np 2 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 cuda-mpich-debug-3proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -635,7 +635,7 @@ cuda-mpich-debug-3proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1
       - cd build
-      - INQ_EXEC_ENV="mpirun.mpich -np 3 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
+      - INQ_EXEC_ENV="mpirun.mpich -np 3 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 cuda-mpich-debug-4proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -650,7 +650,7 @@ cuda-mpich-debug-4proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build
-      - INQ_EXEC_ENV="mpirun.mpich -np 4 $GPUBIND" ctest --output-on-failure --timeout 3600 -j1
+      - INQ_EXEC_ENV="mpirun.mpich -np 4 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 #########################################################################################################################
 # NVIDIA MPICH NCCL
