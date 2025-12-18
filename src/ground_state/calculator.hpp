@@ -158,6 +158,7 @@ public:
 				auto exe = ham_.exchange().update(electrons);
 				exe_diff = fabs(exe - old_exe);
 				old_exe = exe;
+				update_hf = false;
 			}
 			
 			for(auto & phi : electrons.kpin()) {
