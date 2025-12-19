@@ -266,6 +266,13 @@ public:
 	
 	
 };
+
+template <typename Perturbation = perturbations::none>
+auto calculate(systems::ions const & ions, systems::electrons & electrons, const options::theory & inter = {}, options::ground_state const & solver = {}, Perturbation const & pert = {}){
+	auto calc = calculator{ions, electrons, inter, solver, pert};
+	return calc(electrons);
+}
+
 }
 }
 #endif

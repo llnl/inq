@@ -10,7 +10,6 @@
 #include <systems/electrons.hpp>
 #include <utils/match.hpp>
 #include <ground_state/initial_guess.hpp>
-#include <ground_state/calculate.hpp>
 
 #include <input/environment.hpp>
 

@@ -11,7 +11,7 @@
 
 #include <bomd/propagate.hpp>
 #include <ground_state/initial_guess.hpp>
-#include <ground_state/calculate.hpp>
+#include <ground_state/calculator.hpp>
 #include <operations/io.hpp>
 #include <real_time/propagate.hpp>
 #include <utils/match.hpp>

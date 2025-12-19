@@ -18,7 +18,7 @@
  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include <ground_state/calculate.hpp>
+#include <ground_state/calculator.hpp>
 #include <ground_state/initial_guess.hpp>
 #include <systems/electrons.hpp>
 #include <systems/ions.hpp>
