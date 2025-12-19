@@ -503,6 +503,21 @@ cuda-mpich-fast-build:
       paths:
       - cuda-mpich-fast-build.tar.xz
 
+cuda-mpich-fast-speed:
+    image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
+    stage: gpu-test
+    needs: [cuda-mpich-fast-build]    
+    tags:
+      - cuda-docker
+    script:
+      - apt update -qq
+      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libopenmpi-dev openmpi-bin libboost-system-dev libboost-serialization-dev libhdf5-dev libhdf5-openmpi-dev valgrind libmpich-dev mpich libhdf5-dev libhdf5-mpich-dev wget python3 python3-dev ase
+      - time tar -Ipixz -xvf cuda-mpich-fast-build.tar.xz
+      - export GPUBIND=`pwd`/scripts/gpubind
+      - export CUDA_VISIBLE_DEVICES=2
+      - cd build      
+      - mpirun.mpich -np 1 $GPUBIND ./speed_test/copies
+
 cuda-mpich-fast-1proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
     stage: gpu-test
@@ -807,6 +822,17 @@ arm-gcc-mpich-debug-build:
     artifacts:
       paths:
       - arm-gcc-mpich-debug-build.tar.xz
+
+arm-gcc-mpich-debug-speed:
+    image: npneq/debian_inq_deps:bookworm_arm64    
+    stage: test
+    needs: [arm-gcc-mpich-debug-build]
+    tags:
+      - arm
+    script:
+      - time tar -Ipixz -xvf arm-gcc-mpich-debug-build.tar.xz
+      - cd build
+      - ./speed_test/copies
 
 arm-gcc-mpich-debug-1proc:
     image: npneq/debian_inq_deps:bookworm_arm64    
