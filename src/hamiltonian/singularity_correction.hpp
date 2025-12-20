@@ -71,20 +71,19 @@ public:
 			return 1.0/pow(3.0, istep);
 		};
 		
-		for(int istep = 0; istep < nsteps; istep++){
+		for(auto ikx = 0; ikx <= nk; ikx++){
+			for(auto iky = -nk; iky <= nk; iky++){
+				for(auto ikz = -nk; ikz <= nk; ikz++){
+					if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
 
-			for(auto ikx = 0; ikx <= nk; ikx++){
-				for(auto iky = -nk; iky <= nk; iky++){
-					for(auto ikz = -nk; ikz <= nk; ikz++){
-						if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
-
+					for(int istep = 0; istep < nsteps; istep++){
 						auto ll = length(istep);
 						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)*ll/(2.0*nk);
 						fzero_ += kvol_element*pow(ll, 3)*auxiliary(cell, qpoint);
 					}
+
 				}
 			}
-
 		}
 
 		fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3);
