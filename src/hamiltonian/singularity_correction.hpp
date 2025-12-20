@@ -33,11 +33,14 @@ public:
 			auto jjp1 = jj + 1;
 			if(jjp1 == 3) jjp1 = 0;
 
-			auto v1 = cell.reciprocal(jj)	 *sin(cell.dot(cell.lattice(jj)	 , 0.5*qpoint));
-			auto v2 = cell.reciprocal(jj)	 *sin(cell.dot(cell.lattice(jj)	 ,		 qpoint));
-			auto v3 = cell.reciprocal(jjp1)*sin(cell.dot(cell.lattice(jjp1),		 qpoint));
+			auto dot2 = cell.dot(cell.lattice(jj)	 , qpoint);
+			auto dot3 = cell.dot(cell.lattice(jjp1), qpoint);
 			
-			val += 4.0*cell.dot(v1, v1) + 2.0*cell.dot(v2, v3);
+			auto s1 = sin(0.5*dot2);
+			auto s2 = sin(    dot2);
+			auto s3 = sin(    dot3);
+				
+			val += 4.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jj))*s1*s1 + 2.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jjp1))*s2*s3;
 		}
 		
 		return 4*M_PI*M_PI/val;
