@@ -18,90 +18,89 @@ namespace hamiltonian {
 // https://doi.org/10.1103/PhysRevB.75.205126
 class singularity_correction {
 
-  gpu::array<double, 1> fk_;
-  double fzero_;
-  int nkpoints_;
-  double cell_volume_;
+	gpu::array<double, 1> fk_;
+	double fzero_;
+	int nkpoints_;
+	double cell_volume_;
 
 public:
 
-  // the function defined in Eq. 16
-  static auto auxiliary(systems::cell const & cell, vector3<double, covariant> const & qpoint){
-    auto val = 0.0;
-		    auto const & metric = cell.metric();
+	// the function defined in Eq. 16
+	static auto auxiliary(systems::cell const & cell, vector3<double, covariant> const & qpoint){
+		auto val = 0.0;
+		auto const & metric = cell.metric();
 
-    for(int jj = 0; jj < 3; jj++){
-      auto jjp1 = jj + 1;
-      if(jjp1 == 3) jjp1 = 0;
+		for(int jj = 0; jj < 3; jj++){
+			auto jjp1 = jj + 1;
+			if(jjp1 == 3) jjp1 = 0;
 
-      auto v1 = cell.reciprocal(jj)  *sin(metric.dot(cell.lattice(jj)  , 0.5*qpoint));
-			auto v2 = cell.reciprocal(jj)  *sin(metric.dot(cell.lattice(jj)  ,     qpoint));
-			auto v3 = cell.reciprocal(jjp1)*sin(metric.dot(cell.lattice(jjp1),     qpoint));
-      
-      val += 4.0*metric.dot(v1, v1) + 2.0*metric.dot(v2, v3);
-    }
+			auto v1 = cell.reciprocal(jj)	 *sin(metric.dot(cell.lattice(jj)	 , 0.5*qpoint));
+			auto v2 = cell.reciprocal(jj)	 *sin(metric.dot(cell.lattice(jj)	 ,		 qpoint));
+			auto v3 = cell.reciprocal(jjp1)*sin(metric.dot(cell.lattice(jjp1),		 qpoint));
+			
+			val += 4.0*metric.dot(v1, v1) + 2.0*metric.dot(v2, v3);
+		}
 		
-    return 4*M_PI*M_PI/val;
-  }
+		return 4*M_PI*M_PI/val;
+	}
 
-  singularity_correction(systems::cell const & cell, ionic::brillouin const & bzone):
-    fk_(bzone.size()),
-    nkpoints_(bzone.size()),
-    cell_volume_(cell.volume())
-  {
-
-    for(int ik = 0; ik < bzone.size(); ik++){
-      
-      fk_[ik] = 0.0;
+	singularity_correction(systems::cell const & cell, ionic::brillouin const & bzone):
+		fk_(bzone.size()),
+		nkpoints_(bzone.size()),
+		cell_volume_(cell.volume())
+	{
+		for(int ik = 0; ik < bzone.size(); ik++){
+			
+			fk_[ik] = 0.0;
 			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
-        auto qpoint = bzone.kpoint(ik) - bzone.kpoint(ik2);
-        if(cell.metric().norm(qpoint) < 1e-6) continue;
-        fk_[ik] += bzone.kpoint_weight(ik2)*auxiliary(cell, qpoint);
+				auto qpoint = bzone.kpoint(ik) - bzone.kpoint(ik2);
+				if(cell.metric().norm(qpoint) < 1e-6) continue;
+				fk_[ik] += bzone.kpoint_weight(ik2)*auxiliary(cell, qpoint);
+			}
+			fk_[ik] *= 4.0*M_PI/cell.volume();
+		}
+
+		auto const nsteps = 7;
+		auto const nk = 60;
+		
+		fzero_ = 0.0;
+		auto length = 1.0;
+		auto kvol_element = pow(2.0*M_PI/(2.0*nk + 1.0), 3)/cell.volume();
+		
+		for(int istep = 0; istep < nsteps; istep++){
+
+			for(auto ikx = 0; ikx <= nk; ikx++){
+				for(auto iky = -nk; iky <= nk; iky++){
+					for(auto ikz = -nk; ikz <= nk; ikz++){
+						if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
+						
+						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)*length/(2.0*nk);
+						fzero_ += kvol_element*auxiliary(cell, qpoint);
+					}
 				}
-      fk_[ik] *= 4.0*M_PI/cell.volume();
-    }
+			}
+			if(istep < nsteps - 1){
+				length /= 3.0;
+				kvol_element /= 27.0;
+			}
+		}
 
-    auto const nsteps = 7;
-    auto const nk = 60;
-    
-    fzero_ = 0.0;
-    auto length = 1.0;
-    auto kvol_element = pow(2.0*M_PI/(2.0*nk + 1.0), 3)/cell.volume();
-    
-    for(int istep = 0; istep < nsteps; istep++){
+		fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3);
+		fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length;
+	}
 
-      for(auto ikx = 0; ikx <= nk; ikx++){
-        for(auto iky = -nk; iky <= nk; iky++){
-          for(auto ikz = -nk; ikz <= nk; ikz++){          
-            if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
-            
-            auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)*length/(2.0*nk);
-            fzero_ += kvol_element*auxiliary(cell, qpoint);
-          }
-        }
-      }
-      if(istep < nsteps - 1){
-        length /= 3.0;
-        kvol_element /= 27.0;
-      }
-    }
+	auto fk(int ik) const {
+		return fk_[ik];
+	}
 
-    fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3);
-    fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length;
-  }
+	auto fzero() const {
+		return fzero_;
+	}	 
 
-  auto fk(int ik) const {
-    return fk_[ik];
-  }
-
-  auto fzero() const {
-    return fzero_;
-  }  
-
-  auto operator()(int ik) const {
-    return -nkpoints_*cell_volume_*(fk(ik) - fzero());
-  }
-  
+	auto operator()(int ik) const {
+		return -nkpoints_*cell_volume_*(fk(ik) - fzero());
+	}
+	
 };
 }
 }
