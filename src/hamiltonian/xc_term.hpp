@@ -378,22 +378,19 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		//Define k-vector for test function
 		auto kvec = 2.0*M_PI*vector3<double>(1.0/lx, 1.0/ly, 1.0/lz);
 	
-		auto ff = [] (auto & kk, auto & rr){
+		auto ff = [] GPU_LAMBDA (auto & kk, auto & rr){
 			return std::max(0.0, cos(dot(kk, rr)) + 1.0);
 		};
 
-		for(int ix = 0; ix < bas.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < bas.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < bas.local_sizes()[2]; iz++){
-					auto vec = bas.point_op().rvector_cartesian(ix, iy, iz);
-					density_unp.hypercubic()[ix][iy][iz][0] = ff(kvec, vec);
-					auto pol = sin(norm(vec)/100.0);
-					density_pol.hypercubic()[ix][iy][iz][0] = (1.0 - pol)*ff(kvec, vec);
-					density_pol.hypercubic()[ix][iy][iz][1] = pol*ff(kvec, vec);
-				}
-			}
-		}
-
+		gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
+						 [point_op = bas.point_op(), dunp = begin(density_unp.hypercubic()), dpol = begin(density_pol.hypercubic()), ff, kvec] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+							 auto vec = point_op.rvector_cartesian(ix, iy, iz);
+							 dunp[ix][iy][iz][0] = ff(kvec, vec);
+							 auto pol = sin(norm(vec)/100.0);
+							 dpol[ix][iy][iz][0] = (1.0 - pol)*ff(kvec, vec);
+							 dpol[ix][iy][iz][1] = pol*ff(kvec, vec);
+						 });
+		
 		observables::density::normalize(density_unp, 42.0);
 		observables::density::normalize(density_pol, 42.0);
 	
