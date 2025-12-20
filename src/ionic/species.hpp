@@ -11,7 +11,6 @@
 
 #include <pseudopod/element.hpp>
 #include <pseudopod/set_id.hpp>
-#include <utils/merge_optional.hpp>
 #include <vector>
 #include <cmath>
 #include <optional>
