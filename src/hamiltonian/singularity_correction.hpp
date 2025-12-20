@@ -49,6 +49,8 @@ public:
 		nkpoints_(bzone.size()),
 		cell_volume_(cell.volume())
 	{
+		CALI_CXX_MARK_SCOPE("singularity_correction::constructor");
+		
 		for(int ik = 0; ik < bzone.size(); ik++){
 			
 			fk_[ik] = 0.0;
