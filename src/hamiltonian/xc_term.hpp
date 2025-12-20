@@ -342,168 +342,174 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	using Catch::Approx;
 	
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
+	
+	SECTION("Functionals"){
+		
+		if(comm.size() > 4) return; //FIXME: check the problem for size 5. It returns a multi error
+	
+		auto lx = 10.3;
+		auto ly = 13.8;
+		auto lz =  4.5;
+	
+		basis::real_space bas(systems::cell::orthorhombic(lx*1.0_b, ly*1.0_b, lz*1.0_b), /*spacing =*/ 0.40557787, comm);
 
-	if(comm.size() > 4) return; //FIXME: check the problem for size 5. It returns a multi error
+		CHECK(bas.sizes()[0] == 25);
+		CHECK(bas.sizes()[1] == 35);
+		CHECK(bas.sizes()[2] == 12);
 	
-	auto lx = 10.3;
-	auto ly = 13.8;
-	auto lz =  4.5;
-	
-	basis::real_space bas(systems::cell::orthorhombic(lx*1.0_b, ly*1.0_b, lz*1.0_b), /*spacing =*/ 0.40557787, comm);
+		//some variables for testing explicit values in a point
+		auto contains1 = bas.cubic_part(0).contains(20) and bas.cubic_part(1).contains(8) and bas.cubic_part(2).contains(4);
+		auto p1 = vector3{
+			bas.cubic_part(0).global_to_local(parallel::global_index(20)),
+			bas.cubic_part(1).global_to_local(parallel::global_index(8)),
+			bas.cubic_part(2).global_to_local(parallel::global_index(4))
+		};
 
-	CHECK(bas.sizes()[0] == 25);
-	CHECK(bas.sizes()[1] == 35);
-	CHECK(bas.sizes()[2] == 12);
+		auto contains2 = bas.cubic_part(0).contains(1) and bas.cubic_part(1).contains(27) and bas.cubic_part(2).contains(3);
+		auto p2 = vector3{
+			bas.cubic_part(0).global_to_local(parallel::global_index(1)),
+			bas.cubic_part(1).global_to_local(parallel::global_index(27)),
+			bas.cubic_part(2).global_to_local(parallel::global_index(3))
+		};
 	
-	//some variables for testing explicit values in a point
-	auto contains1 = bas.cubic_part(0).contains(20) and bas.cubic_part(1).contains(8) and bas.cubic_part(2).contains(4);
-	auto p1 = vector3{
-		bas.cubic_part(0).global_to_local(parallel::global_index(20)),
-		bas.cubic_part(1).global_to_local(parallel::global_index(8)),
-		bas.cubic_part(2).global_to_local(parallel::global_index(4))
-	};
+		basis::field_set<basis::real_space, double> density_unp(bas, 1);  
+		basis::field_set<basis::real_space, double> density_pol(bas, 2);
+	
+		//Define k-vector for test function
+		auto kvec = 2.0*M_PI*vector3<double>(1.0/lx, 1.0/ly, 1.0/lz);
+	
+		auto ff = [] (auto & kk, auto & rr){
+			return std::max(0.0, cos(dot(kk, rr)) + 1.0);
+		};
 
-	auto contains2 = bas.cubic_part(0).contains(1) and bas.cubic_part(1).contains(27) and bas.cubic_part(2).contains(3);
-	auto p2 = vector3{
-		bas.cubic_part(0).global_to_local(parallel::global_index(1)),
-		bas.cubic_part(1).global_to_local(parallel::global_index(27)),
-		bas.cubic_part(2).global_to_local(parallel::global_index(3))
-	};
-	
-	basis::field_set<basis::real_space, double> density_unp(bas, 1);  
-	basis::field_set<basis::real_space, double> density_pol(bas, 2);
-	
-	//Define k-vector for test function
-	auto kvec = 2.0*M_PI*vector3<double>(1.0/lx, 1.0/ly, 1.0/lz);
-	
-	auto ff = [] (auto & kk, auto & rr){
-		return std::max(0.0, cos(dot(kk, rr)) + 1.0);
-	};
-
-	for(int ix = 0; ix < bas.local_sizes()[0]; ix++){
-		for(int iy = 0; iy < bas.local_sizes()[1]; iy++){
-			for(int iz = 0; iz < bas.local_sizes()[2]; iz++){
-				auto vec = bas.point_op().rvector_cartesian(ix, iy, iz);
-				density_unp.hypercubic()[ix][iy][iz][0] = ff(kvec, vec);
-				auto pol = sin(norm(vec)/100.0);
-				density_pol.hypercubic()[ix][iy][iz][0] = (1.0 - pol)*ff(kvec, vec);
-				density_pol.hypercubic()[ix][iy][iz][1] = pol*ff(kvec, vec);
+		for(int ix = 0; ix < bas.local_sizes()[0]; ix++){
+			for(int iy = 0; iy < bas.local_sizes()[1]; iy++){
+				for(int iz = 0; iz < bas.local_sizes()[2]; iz++){
+					auto vec = bas.point_op().rvector_cartesian(ix, iy, iz);
+					density_unp.hypercubic()[ix][iy][iz][0] = ff(kvec, vec);
+					auto pol = sin(norm(vec)/100.0);
+					density_pol.hypercubic()[ix][iy][iz][0] = (1.0 - pol)*ff(kvec, vec);
+					density_pol.hypercubic()[ix][iy][iz][1] = pol*ff(kvec, vec);
+				}
 			}
 		}
-	}
 
-	observables::density::normalize(density_unp, 42.0);
-	observables::density::normalize(density_pol, 42.0);
+		observables::density::normalize(density_unp, 42.0);
+		observables::density::normalize(density_pol, 42.0);
 	
-	CHECK(operations::integral_sum(density_unp) == 42.0_a);
-	CHECK(operations::integral_sum(density_pol) == 42.0_a); 
+		CHECK(operations::integral_sum(density_unp) == 42.0_a);
+		CHECK(operations::integral_sum(density_pol) == 42.0_a); 
 	
-	auto grad_unp = std::optional{operations::gradient(density_unp)};
-	auto grad_pol = std::optional{operations::gradient(density_pol)};
-
-	if(contains1) {
-		CHECK(density_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0232053167_a);
-		
-		CHECK(density_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0194068103_a);
-		CHECK(density_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.0037985065_a);
-	}
-
-	if(contains2) {
-		CHECK(density_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  0.1264954137_a);
-		
-		CHECK(density_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  0.1121251439_a);
-		CHECK(density_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] ==  0.0143702698_a);
-	}
-
-	basis::field_set<basis::real_space, double> vfunc_unp(bas, 1);  
-	basis::field_set<basis::real_space, double> vfunc_pol(bas, 2);
-	
-	SECTION("LDA_X"){
-
-		hamiltonian::xc_functional func_unp(XC_LDA_X, 1);
-		hamiltonian::xc_functional func_pol(XC_LDA_X, 2);
-		
-		double efunc_unp = NAN;
-		double efunc_pol = NAN;
-		
-		hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-		hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
-
-		CHECK(efunc_unp == -14.0558385758_a);
-		CHECK(efunc_pol == -15.1680272137_a);
+		auto grad_unp = std::optional{operations::gradient(density_unp)};
+		auto grad_pol = std::optional{operations::gradient(density_pol)};
 
 		if(contains1) {
-			CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.2808792311_a);
-			
-			CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.3334150345_a);
-			CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.193584872_a);
+			CHECK(density_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0232053167_a);
+		
+			CHECK(density_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0194068103_a);
+			CHECK(density_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.0037985065_a);
 		}
 
 		if(contains2) {
-			CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.494328201_a);
-			
-			CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5982758379_a);
-			CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.3016398853_a);
+			CHECK(density_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  0.1264954137_a);
+		
+			CHECK(density_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  0.1121251439_a);
+			CHECK(density_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] ==  0.0143702698_a);
 		}
 
-	}
+		basis::field_set<basis::real_space, double> vfunc_unp(bas, 1);  
+		basis::field_set<basis::real_space, double> vfunc_pol(bas, 2);
+	
+		//LDA_X
+		{
 
-	SECTION("PBE_C"){
+			hamiltonian::xc_functional func_unp(XC_LDA_X, 1);
+			hamiltonian::xc_functional func_pol(XC_LDA_X, 2);
 		
-		hamiltonian::xc_functional func_unp(XC_GGA_C_PBE, 1);
-		hamiltonian::xc_functional func_pol(XC_GGA_C_PBE, 2);
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
 		
-		double efunc_unp = NAN;
-		double efunc_pol = NAN;
-		
-		hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-		hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
 
-		CHECK(efunc_unp == -1.8220292936_a);
-		CHECK(efunc_pol == -1.5670264162_a);
-		
-		if(contains1) {
-			CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0485682509_a);
+			CHECK(efunc_unp == -14.0558385758_a);
+			CHECK(efunc_pol == -15.1680272137_a);
+
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.2808792311_a);
 			
-			CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0356047498_a);
-			CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.0430996024_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.3334150345_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.193584872_a);
+			}
+
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.494328201_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5982758379_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.3016398853_a);
+			}
+
 		}
 
-		if(contains2) {
-			CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.0430639893_a);
+		//PBE_C
+		{
+		
+			hamiltonian::xc_functional func_unp(XC_GGA_C_PBE, 1);
+			hamiltonian::xc_functional func_pol(XC_GGA_C_PBE, 2);
+		
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
+		
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+
+			CHECK(efunc_unp == -1.8220292936_a);
+			CHECK(efunc_pol == -1.5670264162_a);
+		
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0485682509_a);
 			
-			CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.0216393428_a);
-			CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.1008833788_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0356047498_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.0430996024_a);
+			}
+
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.0430639893_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.0216393428_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.1008833788_a);
+			}
+
 		}
 
-	}
+		//B3LYP
+		{
+		
+			hamiltonian::xc_functional func_unp(XC_HYB_GGA_XC_B3LYP, 1);
+			hamiltonian::xc_functional func_pol(XC_HYB_GGA_XC_B3LYP, 2);
+		
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
+		
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
 
-	SECTION("B3LYP"){
+			CHECK(efunc_unp == -13.2435562623_a);
+			CHECK(efunc_pol == -13.838126858_a);
 		
-		hamiltonian::xc_functional func_unp(XC_HYB_GGA_XC_B3LYP, 1);
-		hamiltonian::xc_functional func_pol(XC_HYB_GGA_XC_B3LYP, 2);
-		
-		double efunc_unp = NAN;
-		double efunc_pol = NAN;
-		
-		hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-		hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
-
-		CHECK(efunc_unp == -13.2435562623_a);
-		CHECK(efunc_pol == -13.838126858_a);
-		
-		if(contains1) {
-			CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0182716851_a);
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0182716851_a);
 			
-			CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.1772863551_a);
-			CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.1830076554_a);
-		}
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.1772863551_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.1830076554_a);
+			}
 
-		if(contains2) {
-			CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.4348251846_a);
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.4348251846_a);
 			
-			CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5046576968_a);
-			CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.352403833_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5046576968_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.352403833_a);
+			}
 		}
 	}
 
