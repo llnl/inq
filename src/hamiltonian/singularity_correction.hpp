@@ -65,8 +65,11 @@ public:
 		auto const nk = 60;
 		
 		fzero_ = 0.0;
-		auto length = 1.0;
-		auto kvol_element = pow(2.0*M_PI/(2.0*nk + 1.0), 3)/cell.volume();
+		auto const kvol_element = pow(2.0*M_PI/(2.0*nk + 1.0), 3)/cell.volume();
+
+		auto length = [] (auto istep) {
+			return 1.0/pow(3.0, istep);
+		};
 		
 		for(int istep = 0; istep < nsteps; istep++){
 
@@ -74,20 +77,18 @@ public:
 				for(auto iky = -nk; iky <= nk; iky++){
 					for(auto ikz = -nk; ikz <= nk; ikz++){
 						if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
-						
-						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)*length/(2.0*nk);
-						fzero_ += kvol_element*auxiliary(cell, qpoint);
+
+						auto ll = length(istep);
+						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)*ll/(2.0*nk);
+						fzero_ += kvol_element*pow(ll, 3)*auxiliary(cell, qpoint);
 					}
 				}
 			}
-			if(istep < nsteps - 1){
-				length /= 3.0;
-				kvol_element /= 27.0;
-			}
+
 		}
 
 		fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3);
-		fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length;
+		fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length(nsteps - 1);
 	}
 
 	auto fk(int ik) const {
