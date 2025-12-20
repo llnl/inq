@@ -25,6 +25,8 @@ namespace observables {
 template <typename HamiltonianType>
 basis::field<basis::real_space, vector3<double, covariant>> current_density(const systems::ions & ions, systems::electrons const & electrons, HamiltonianType const & ham){
 
+	CALI_CXX_MARK_FUNCTION;
+	
 	basis::field<basis::real_space, vector3<double, covariant>> cdensity(electrons.density_basis());
 	cdensity.fill(vector3<double, covariant>{0.0, 0.0, 0.0});
 
