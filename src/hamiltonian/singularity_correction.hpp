@@ -117,54 +117,54 @@ public:
 
 TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
-  using namespace inq;
+	using namespace inq;
 	using namespace inq::magnitude;	
 	using namespace Catch::literals;
 	using Catch::Approx;
 
-  SECTION("Auxiliary function cubic"){
-    auto aa = 10.18_b;
+	SECTION("Auxiliary function cubic"){
+		auto aa = 10.18_b;
 
 		auto ions = systems::ions(systems::cell::lattice({aa, 0.0_b, 0.0_b}, {0.0_b, aa, 0.0_b}, {0.0_b, 0.0_b, aa}));
-    auto const & cell = ions.cell();
+		auto const & cell = ions.cell();
 
-    auto bzone = ionic::brillouin(ions, input::kpoints::grid({2, 2, 2}));
-        
-    CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.0, -0.5, 0.0}) == 25.9081_a);
-    CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{8.3333333333333332E-003, 7.4999999999999997E-002, 0.26666666666666666}) == 42.650855183181122_a);
-    CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.11666666666666667, 0.20000000000000001, 0.21666666666666667}) == 29.780683447124286_a);    
-    
-    auto sing = hamiltonian::singularity_correction(cell, bzone);
+		auto bzone = ionic::brillouin(ions, input::kpoints::grid({2, 2, 2}));
+				
+		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.0, -0.5, 0.0}) == 25.9081_a);
+		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{8.3333333333333332E-003, 7.4999999999999997E-002, 0.26666666666666666}) == 42.650855183181122_a);
+		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.11666666666666667, 0.20000000000000001, 0.21666666666666667}) == 29.780683447124286_a);		
+		
+		auto sing = hamiltonian::singularity_correction(cell, bzone);
 
-    CHECK(sing.fzero() == 0.30983869660201141_a);
+		CHECK(sing.fzero() == 0.30983869660201141_a);
 
-    CHECK(sing.fk(0) == 0.18644848345224296_a);
-    CHECK(sing.fk(1) == 0.18644848345224296_a);
-    CHECK(sing.fk(2) == 0.18644848345224296_a);
-    CHECK(sing.fk(3) == 0.18644848345224296_a);
-    CHECK(sing.fk(4) == 0.18644848345224296_a);
-    CHECK(sing.fk(5) == 0.18644848345224296_a);
-    CHECK(sing.fk(6) == 0.18644848345224296_a);
-    CHECK(sing.fk(7) == 0.18644848345224296_a);
-    
-    CHECK(sing(0) == 1041.3915164701_a);
-    CHECK(sing(1) == 1041.3915164701_a);
-    CHECK(sing(2) == 1041.3915164701_a);
-    CHECK(sing(3) == 1041.3915164701_a);
-    CHECK(sing(4) == 1041.3915164701_a);
-    CHECK(sing(5) == 1041.3915164701_a);
-    CHECK(sing(6) == 1041.3915164701_a);
-    CHECK(sing(7) == 1041.3915164701_a);
-    
-  }
-    
-    SECTION("Auxiliary function non-orthogonal"){
-    auto aa = 6.7408326;
-    systems::cell cell(aa*vector3<double>(0.0, 0.5, 0.5), aa*vector3<double>(0.5, 0.0, 0.5), aa*vector3<double>(0.5, 0.5, 0.0));
-    
-    CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{1.6666666666666666E-002, 0.28333333333333333, 0.39166666666666666}) == 2.77471621018199290_a);
-    CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.12500000000000000,-0.20833333333333334, -0.23333333333333334}) == 3.6560191647005245_a);
-    CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{ 0.14999999999999999, 0.25000000000000000, -3.3333333333333333E-002}) == 5.8717108336249790_a);
-  }  
+		CHECK(sing.fk(0) == 0.18644848345224296_a);
+		CHECK(sing.fk(1) == 0.18644848345224296_a);
+		CHECK(sing.fk(2) == 0.18644848345224296_a);
+		CHECK(sing.fk(3) == 0.18644848345224296_a);
+		CHECK(sing.fk(4) == 0.18644848345224296_a);
+		CHECK(sing.fk(5) == 0.18644848345224296_a);
+		CHECK(sing.fk(6) == 0.18644848345224296_a);
+		CHECK(sing.fk(7) == 0.18644848345224296_a);
+		
+		CHECK(sing(0) == 1041.3915164701_a);
+		CHECK(sing(1) == 1041.3915164701_a);
+		CHECK(sing(2) == 1041.3915164701_a);
+		CHECK(sing(3) == 1041.3915164701_a);
+		CHECK(sing(4) == 1041.3915164701_a);
+		CHECK(sing(5) == 1041.3915164701_a);
+		CHECK(sing(6) == 1041.3915164701_a);
+		CHECK(sing(7) == 1041.3915164701_a);
+		
+	}
+		
+	SECTION("Auxiliary function non-orthogonal"){
+		auto aa = 6.7408326;
+		systems::cell cell(aa*vector3<double>(0.0, 0.5, 0.5), aa*vector3<double>(0.5, 0.0, 0.5), aa*vector3<double>(0.5, 0.5, 0.0));
+		
+		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{1.6666666666666666E-002, 0.28333333333333333, 0.39166666666666666}) == 2.77471621018199290_a);
+		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.12500000000000000,-0.20833333333333334, -0.23333333333333334}) == 3.6560191647005245_a);
+		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{ 0.14999999999999999, 0.25000000000000000, -3.3333333333333333E-002}) == 5.8717108336249790_a);
+	}	 
 }
 #endif
