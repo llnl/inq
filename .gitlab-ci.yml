@@ -516,7 +516,7 @@ cuda-mpich-fast-speed:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=2
       - cd build      
-      - mpirun.mpich -np 1 $GPUBIND ./speed_test/copies
+      - mpirun.mpich -np 1 $GPUBIND ./speed_tests/copies
 
 cuda-mpich-fast-1proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -832,7 +832,7 @@ arm-gcc-mpich-debug-speed:
     script:
       - time tar -Ipixz -xvf arm-gcc-mpich-debug-build.tar.xz
       - cd build
-      - ./speed_test/copies
+      - ./speed_tests/copies
 
 arm-gcc-mpich-debug-1proc:
     image: npneq/debian_inq_deps:bookworm_arm64    
