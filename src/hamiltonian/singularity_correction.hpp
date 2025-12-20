@@ -25,33 +25,58 @@ class singularity_correction {
 
 public:
 
+	static auto cell_projection(systems::cell const & cell, vector3<double, covariant> const & qpoint) {
+		vector3<double> dp3;
+		for(int jj = 0; jj < 3; jj++){
+			dp3[jj] = cell.dot(cell.lattice(jj), qpoint);
+		}
+		return dp3;
+	}
+	
 	// the function defined in Eq. 16
-	static auto auxiliary(systems::cell const & cell, vector3<double, covariant> const & qpoint){
+	static auto auxiliary(vector3<double> const & dp1, vector3<double> const & dp2, vector3<double> const & dp3, vector3<double, covariant> const & qpoint){
 		auto val = 0.0;
 
 		for(int jj = 0; jj < 3; jj++){
 			auto jjp1 = jj + 1;
 			if(jjp1 == 3) jjp1 = 0;
 
-			auto dot2 = cell.dot(cell.lattice(jj)	 , qpoint);
-			auto dot3 = cell.dot(cell.lattice(jjp1), qpoint);
-			
-			auto s1 = sin(0.5*dot2);
-			auto s2 = sin(    dot2);
-			auto s3 = sin(    dot3);
+			auto s1 = sin(0.5*dp3[jj]);
+			auto s2 = sin(    dp3[jj]);
+			auto s3 = sin(    dp3[jjp1]);
 				
-			val += 4.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jj))*s1*s1 + 2.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jjp1))*s2*s3;
+			val += dp1[jj]*s1*s1 + dp2[jj]*s2*s3;
 		}
 		
 		return 4*M_PI*M_PI/val;
 	}
-
+	
+	static auto auxiliary(systems::cell const & cell, vector3<double, covariant> const & qpoint){
+		vector3<double> dp1, dp2;
+		for(int jj = 0; jj < 3; jj++){
+			auto jjp1 = jj + 1;
+			if(jjp1 == 3) jjp1 = 0;
+			dp1[jj] = 4.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jj));
+			dp2[jj] = 2.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jjp1));
+		}
+		
+		return auxiliary(dp1, dp2, cell_projection(cell, qpoint), qpoint);
+	}
+	
 	singularity_correction(systems::cell const & cell, ionic::brillouin const & bzone):
 		fk_(bzone.size()),
 		nkpoints_(bzone.size()),
 		cell_volume_(cell.volume())
 	{
 		CALI_CXX_MARK_SCOPE("singularity_correction::constructor");
+
+		vector3<double> dp1, dp2;
+		for(int jj = 0; jj < 3; jj++){
+			auto jjp1 = jj + 1;
+			if(jjp1 == 3) jjp1 = 0;
+			dp1[jj] = 4.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jj));
+			dp2[jj] = 2.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jjp1));
+		}
 		
 		for(int ik = 0; ik < bzone.size(); ik++){
 			
@@ -59,7 +84,7 @@ public:
 			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
 				auto qpoint = bzone.kpoint(ik) - bzone.kpoint(ik2);
 				if(cell.norm(qpoint) < 1e-6) continue;
-				fk_[ik] += bzone.kpoint_weight(ik2)*auxiliary(cell, qpoint);
+				fk_[ik] += bzone.kpoint_weight(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint), qpoint);
 			}
 			fk_[ik] *= 4.0*M_PI/cell.volume();
 		}
@@ -82,7 +107,7 @@ public:
 					for(int istep = 0; istep < nsteps; istep++){
 						auto ll = length(istep);
 						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)*ll/(2.0*nk);
-						fzero_ += kvol_element*pow(ll, 3)*auxiliary(cell, qpoint);
+						fzero_ += kvol_element*pow(ll, 3)*auxiliary(dp1, dp2, cell_projection(cell, qpoint), qpoint);
 					}
 
 				}
@@ -131,7 +156,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		auto const & cell = ions.cell();
 
 		auto bzone = ionic::brillouin(ions, input::kpoints::grid({2, 2, 2}));
-				
+
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.0, -0.5, 0.0}) == 25.9081_a);
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{8.3333333333333332E-003, 7.4999999999999997E-002, 0.26666666666666666}) == 42.650855183181122_a);
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.11666666666666667, 0.20000000000000001, 0.21666666666666667}) == 29.780683447124286_a);		
@@ -163,7 +188,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	SECTION("Auxiliary function non-orthogonal"){
 		auto aa = 6.7408326;
 		systems::cell cell(aa*vector3<double>(0.0, 0.5, 0.5), aa*vector3<double>(0.5, 0.0, 0.5), aa*vector3<double>(0.5, 0.5, 0.0));
-		
+
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{1.6666666666666666E-002, 0.28333333333333333, 0.39166666666666666}) == 2.77471621018199290_a);
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.12500000000000000,-0.20833333333333334, -0.23333333333333334}) == 3.6560191647005245_a);
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{ 0.14999999999999999, 0.25000000000000000, -3.3333333333333333E-002}) == 5.8717108336249790_a);
