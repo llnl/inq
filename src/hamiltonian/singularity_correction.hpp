@@ -34,7 +34,8 @@ public:
 	}
 	
 	// the function defined in Eq. 16
-	static auto auxiliary(vector3<double> const & dp1, vector3<double> const & dp2, vector3<double> const & dp3, vector3<double, covariant> const & qpoint){
+	static auto auxiliary(vector3<double> const & dp1, vector3<double> const & dp2, vector3<double> const & dp3){
+		
 		auto val = 0.0;
 
 		for(int jj = 0; jj < 3; jj++){
@@ -60,7 +61,7 @@ public:
 			dp2[jj] = 2.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jjp1));
 		}
 		
-		return auxiliary(dp1, dp2, cell_projection(cell, qpoint), qpoint);
+		return auxiliary(dp1, dp2, cell_projection(cell, qpoint));
 	}
 	
 	singularity_correction(systems::cell const & cell, ionic::brillouin const & bzone):
@@ -84,7 +85,7 @@ public:
 			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
 				auto qpoint = bzone.kpoint(ik) - bzone.kpoint(ik2);
 				if(cell.norm(qpoint) < 1e-6) continue;
-				fk_[ik] += bzone.kpoint_weight(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint), qpoint);
+				fk_[ik] += bzone.kpoint_weight(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint));
 			}
 			fk_[ik] *= 4.0*M_PI/cell.volume();
 		}
@@ -104,10 +105,12 @@ public:
 				for(auto ikz = -nk; ikz <= nk; ikz++){
 					if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
 
+					auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)/(2.0*nk);
+					auto dp3 = cell_projection(cell, qpoint);
+					
 					for(int istep = 0; istep < nsteps; istep++){
 						auto ll = length(istep);
-						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)*ll/(2.0*nk);
-						fzero_ += kvol_element*pow(ll, 3)*auxiliary(dp1, dp2, cell_projection(cell, qpoint), qpoint);
+						fzero_ += kvol_element*pow(ll, 3)*auxiliary(dp1, dp2, dp3*ll);
 					}
 
 				}
