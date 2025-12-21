@@ -102,21 +102,21 @@ public:
 			for(auto ikx = 0; ikx <= nk; ikx++){
 				for(auto iky = -nk; iky <= nk; iky++){
 					for(auto ikz = -nk; ikz <= nk; ikz++){
-						if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
+						if(3*ikx <= nk and 3*abs(iky) <= nk and 3*abs(ikz) <= nk) continue;
 						
-						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)/(2.0*nk);
+						auto qpoint = (M_PI/nk)*vector3<int, covariant>(ikx, iky, ikz);
 						auto dp3 = cell_projection(cell, qpoint);
 						
 						for(int istep = 0; istep < nsteps; istep++){
 							auto ll = length(istep);
-							fzero_ += kvol_element*pow(ll, 3)*auxiliary(dp1, dp2, dp3*ll);
+							fzero_ += ll*ll*ll*auxiliary(dp1, dp2, dp3*ll);
 						}
 						
 					}
 				}
 			}
 
-			fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3);
+			fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3)*kvol_element;
 			fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length(nsteps - 1);
 		}
 	}
