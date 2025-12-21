@@ -36,18 +36,15 @@ public:
 	// the function defined in Eq. 16
 	static auto auxiliary(vector3<double> const & dp1, vector3<double> const & dp2, vector3<double> const & dp3){
 
-		auto h0 = sin(0.5*dp3[0]);
-		auto h1 = sin(0.5*dp3[1]);
-		auto h2 = sin(0.5*dp3[2]);
+		double s0, s1, s2, c0, c1, c2;
+		sincos(dp3[0], &s0, &c0);
+		sincos(dp3[1], &s1, &c1);
+		sincos(dp3[2], &s2, &c2);
 
-		auto s0 = sin(dp3[0]);
-		auto s1 = sin(dp3[1]);
-		auto s2 = sin(dp3[2]);
-
-		auto v1 = dp1[0]*h0*h0 + dp1[1]*h1*h1 + dp1[2]*h2*h2;
+		auto v1 = dp1[0]*(1.0 - c0) + dp1[1]*(1.0 - c1) + dp1[2]*(1.0 - c2);
 		auto v2 = dp2[0]*s0*s1 + dp2[1]*s1*s2 + dp2[1]*s2*s0;
 		
-		return 4*M_PI*M_PI/(v1 + v2);
+		return 4.0*M_PI*M_PI/(0.5*v1 + v2);
 	}
 	
 	static auto auxiliary(systems::cell const & cell, vector3<double, covariant> const & qpoint){
