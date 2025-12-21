@@ -195,10 +195,21 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	SECTION("Auxiliary function non-orthogonal"){
 		auto aa = 6.7408326;
 		systems::cell cell(aa*vector3<double>(0.0, 0.5, 0.5), aa*vector3<double>(0.5, 0.0, 0.5), aa*vector3<double>(0.5, 0.5, 0.0));
-
+		auto ions = systems::ions(cell);
+		
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{1.6666666666666666E-002, 0.28333333333333333, 0.39166666666666666}) == 2.77471621018199290_a);
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.12500000000000000,-0.20833333333333334, -0.23333333333333334}) == 3.6560191647005245_a);
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{ 0.14999999999999999, 0.25000000000000000, -3.3333333333333333E-002}) == 5.8717108336249790_a);
+
+		auto bzone = ionic::brillouin(ions, input::kpoints::grid({32, 32, 32}));
+		auto sing = hamiltonian::singularity_correction(cell, bzone);
+
+		CHECK(sing.fzero() == 0.6557402601_a);
+
+		CHECK(sing.fk(32*32*32 - 1) == 0.6397684561_a);
+
+		CHECK(sing(32*32*32 - 1) == 40076.0160362316_a);
+		
 	}	 
 }
 #endif
