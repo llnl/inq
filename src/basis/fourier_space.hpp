@@ -62,15 +62,15 @@ public:
 		bool reverse_;
 		std::array<int, 3> sizes_;
 		std::array<inq::parallel::partition, 3> cubic_part_;
-		systems::cell::cell_metric metric_;
+		systems::cell cell_;
 		
 	public:
 		
-		point_operator(bool reverse, std::array<int, 3> const & nr, std::array<inq::parallel::partition, 3> const & dist, systems::cell::cell_metric metric):
+		point_operator(bool reverse, std::array<int, 3> const & nr, std::array<inq::parallel::partition, 3> const & dist, systems::cell cell):
 			reverse_(reverse),
 			sizes_(nr),
 			cubic_part_(dist),
-			metric_(metric)
+			cell_(cell)
 		{
 		}
 
@@ -93,7 +93,7 @@ public:
 		}
 
 		GPU_FUNCTION auto gvector_cartesian(int i0, int i1, int i2) const {
-			return metric_.to_cartesian(gvector(i0, i1, i2));
+			return cell_.to_cartesian(gvector(i0, i1, i2));
 		}
 			
 		GPU_FUNCTION auto outside_sphere(int i0, int i1, int i2) const {
@@ -117,15 +117,15 @@ public:
 		}
 			
 		GPU_FUNCTION double g2(parallel::global_index i0, parallel::global_index i1, parallel::global_index i2) const {
-			return metric_.norm(gvector(i0, i1, i2));
+			return cell_.norm(gvector(i0, i1, i2));
 		}
 			
 		GPU_FUNCTION double g2(int i0, int i1, int i2) const {
-			return metric_.norm(gvector(i0, i1, i2));
+			return cell_.norm(gvector(i0, i1, i2));
 		}
 
-		GPU_FUNCTION auto & metric() const {
-			return metric_;
+		GPU_FUNCTION auto & cell() const {
+			return cell_;
 		}
 
 		GPU_FUNCTION auto to_symmetric_range(int i0, int i1, int i2) const {
@@ -151,7 +151,7 @@ public:
 	};
 
 	auto point_op() const {
-		return point_operator{reverse_, sizes_, cubic_part_, cell_.metric()};
+		return point_operator{reverse_, sizes_, cubic_part_, cell_};
 	}
 
 	template <typename ReciprocalBasis = reciprocal_space>

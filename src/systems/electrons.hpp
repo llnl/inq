@@ -433,7 +433,7 @@ public:
 		CALI_CXX_MARK_FUNCTION;
 		
 		for(auto ik = 0; ik < brillouin_zone_.size(); ik++){
-			if(phi.basis().cell().metric().norm(phi.kpoint() - brillouin_zone_.kpoint(ik)) < 1e-10) return ik;
+			if(phi.basis().cell().norm(phi.kpoint() - brillouin_zone_.kpoint(ik)) < 1e-10) return ik;
 		}
 		assert(false);
 		return 0;

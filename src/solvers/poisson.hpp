@@ -201,7 +201,7 @@ public:
 
 		CALI_CXX_MARK_SCOPE("poisson(complex)");
 
-		auto gshift_cart = density.basis().cell().metric().to_cartesian(gshift);
+		auto gshift_cart = density.basis().cell().to_cartesian(gshift);
 		
 		if(density.basis().cell().periodicity() == 3){
 			poisson_solve_in_place_3d(density, gshift_cart, zeroterm);

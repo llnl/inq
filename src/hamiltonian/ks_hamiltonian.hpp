@@ -142,11 +142,11 @@ public:
 			
 		auto phi_fs = operations::transform::to_fourier(phi);
 		
-		auto hphi_fs = operations::laplacian(phi_fs, -0.5, -2.0*phi.basis().cell().metric().to_contravariant(phi.kpoint() + uniform_vector_potential_));
+		auto hphi_fs = operations::laplacian(phi_fs, -0.5, -2.0*phi.basis().cell().to_contravariant(phi.kpoint() + uniform_vector_potential_));
 			
 		auto hphi = operations::transform::to_real(hphi_fs);
 
-		hamiltonian::scalar_potential_add(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().metric().norm(phi.kpoint() + uniform_vector_potential_), phi, hphi);
+		hamiltonian::scalar_potential_add(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().norm(phi.kpoint() + uniform_vector_potential_), phi, hphi);
 		exchange_(phi, hphi);
 
 		for(auto & pr : projectors_rel_) pr.apply(phi, hphi, phi.kpoint() + uniform_vector_potential_);
@@ -165,7 +165,7 @@ public:
 
 		auto proj = projectors_all_.project(phi_rs, phi.kpoint() + uniform_vector_potential_);
 			
-		auto hphi_rs = hamiltonian::scalar_potential(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().metric().norm(phi.kpoint() + uniform_vector_potential_), phi_rs);
+		auto hphi_rs = hamiltonian::scalar_potential(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().norm(phi.kpoint() + uniform_vector_potential_), phi_rs);
 		
 		exchange_(phi_rs, hphi_rs);
 
@@ -174,7 +174,7 @@ public:
 			
 		auto hphi = operations::transform::to_fourier(hphi_rs);
 
-		operations::laplacian_add(phi, hphi, -0.5, -2.0*phi.basis().cell().metric().to_contravariant(phi.kpoint() + uniform_vector_potential_));
+		operations::laplacian_add(phi, hphi, -0.5, -2.0*phi.basis().cell().to_contravariant(phi.kpoint() + uniform_vector_potential_));
 
 		return hphi;
 	}
@@ -184,7 +184,7 @@ public:
 	auto kinetic_expectation_value(states::orbital_set<basis::fourier_space, complex> const & phi) const {
 		CALI_CXX_MARK_FUNCTION;
 
-		return operations::laplacian_expectation_value(phi, -0.5, -2.0*phi.basis().cell().metric().to_contravariant(phi.kpoint() + uniform_vector_potential_));
+		return operations::laplacian_expectation_value(phi, -0.5, -2.0*phi.basis().cell().to_contravariant(phi.kpoint() + uniform_vector_potential_));
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////

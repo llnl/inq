@@ -59,8 +59,8 @@ public: // for CUDA
 								 [mat = begin(matrix_),
 									spline = ps.projector(iproj_l).function(),
 									sph = sphere_.ref(), l, iproj_lm,
-									metric = basis.cell().metric()] GPU_LAMBDA (auto ipoint, auto m) {
-									 mat[iproj_lm + m][ipoint] = spline(sph.distance(ipoint))*sharmonic::cartesian_real(l, m - l, metric.to_cartesian(sph.point_pos(ipoint)));
+									cell = basis.cell()] GPU_LAMBDA (auto ipoint, auto m) {
+									 mat[iproj_lm + m][ipoint] = spline(sph.distance(ipoint))*sharmonic::cartesian_real(l, m - l, cell.to_cartesian(sph.point_pos(ipoint)));
 								 });
 				
 			} else {
@@ -69,8 +69,8 @@ public: // for CUDA
 				
 				gpu::run(sphere_.size(), 2*l + 1,
 								 [mat = begin(matrix_), spline = ps.projector(iproj_l).function(), sph = sphere_.ref(), l, iproj_lm,
-									dg = double_grid.ref(), spac = basis.rspacing(), metric = basis.cell().metric()] GPU_LAMBDA (auto ipoint, auto m) {
-									 mat[iproj_lm + m][ipoint] = dg.value([spline, l, m] GPU_LAMBDA(auto pos) { return spline(pos.length())*sharmonic::cartesian_real(l, m - l, pos);}, spac, metric.to_cartesian(sph.point_pos(ipoint)));
+									dg = double_grid.ref(), spac = basis.rspacing(), cell = basis.cell()] GPU_LAMBDA (auto ipoint, auto m) {
+									 mat[iproj_lm + m][ipoint] = dg.value([spline, l, m] GPU_LAMBDA(auto pos) { return spline(pos.length())*sharmonic::cartesian_real(l, m - l, pos);}, spac, cell.to_cartesian(sph.point_pos(ipoint)));
 								 });
 				
 			}

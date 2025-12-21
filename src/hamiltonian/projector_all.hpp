@@ -356,17 +356,17 @@ public:
 		for(auto iproj = 0; iproj < nprojs_; iproj++) {
 			if(locally_empty_[iproj]) continue;
 			
-			forces_non_local[iatom_[iproj]] += phi.basis().volume_element()*phi.basis().cell().metric().to_cartesian(force[iproj]);
+			forces_non_local[iatom_[iproj]] += phi.basis().volume_element()*phi.basis().cell().to_cartesian(force[iproj]);
 		}
 		
 		auto lstress = gpu::run(gpu::reduce(nprojs_), gpu::reduce(phi.local_set_size()), gpu::reduce(max_sphere_size_), zero<Stress>(),
 														[oc = begin(occupations), pphi = begin(sphere_proj_phi), gphi = begin(sphere_gphi), spinor_size = phi.local_spinor_set_size(),
-														 pos = begin(positions_), metric = phi.basis().cell().metric()]
+														 pos = begin(positions_), cell = phi.basis().cell()]
 														GPU_LAMBDA (auto iproj, auto ist, auto ip) {
 															auto stress = zero<Stress>();
 															
-															auto grad_cart = metric.to_cartesian(gphi[iproj][ip][ist]);
-															auto pos_cart = metric.to_cartesian(pos[iproj][ip]);
+															auto grad_cart = cell.to_cartesian(gphi[iproj][ip][ist]);
+															auto pos_cart = cell.to_cartesian(pos[iproj][ip]);
 															
 															for(auto alpha = 0; alpha < 3; alpha++) {
 																for(auto beta = 0; beta < 3; beta++) {
@@ -442,12 +442,12 @@ public:
 			if(locally_empty_[iproj]) continue;
 			
 			gpu::run(phi.local_set_size(), max_sphere_size_,
-							 [sgr = begin(sphere_phi_all), srphi = begin(sphere_rphi_all), gr = begin(cphi.hypercubic()), poi = begin(points_), iproj, pos = begin(positions_), kpoint, metric = phi.basis().cell().metric()]
+							 [sgr = begin(sphere_phi_all), srphi = begin(sphere_rphi_all), gr = begin(cphi.hypercubic()), poi = begin(points_), iproj, pos = begin(positions_), kpoint, cell = phi.basis().cell()]
 							 GPU_LAMBDA (auto ist, auto ipoint){
 								 if(poi[iproj][ipoint][0] >= 0){
 									 auto rr = static_cast<vector3<double, contravariant>>(pos[iproj][ipoint]);
 									 auto phase = polar(1.0, -dot(kpoint, rr));
-									 auto commutator = phase*metric.to_covariant(srphi[iproj][ipoint][ist] - rr*sgr[iproj][ipoint][ist]);
+									 auto commutator = phase*cell.to_covariant(srphi[iproj][ipoint][ist] - rr*sgr[iproj][ipoint][ist]);
 									 gpu::atomic::add(&gr[poi[iproj][ipoint][0]][poi[iproj][ipoint][1]][poi[iproj][ipoint][2]][ist], commutator);
 								 }
 							 });

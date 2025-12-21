@@ -64,9 +64,9 @@ public:
 								 [bet = begin(beta_),
 									spline = ps.projector(iproj).function(),
 									sph = sphere_.ref(), ll, iproj_lm, twice_mj, twice_jj,
-									metric = basis.cell().metric()] GPU_LAMBDA (auto ipoint) {
+									cell = basis.cell()] GPU_LAMBDA (auto ipoint) {
 
-									 auto pos = metric.to_cartesian(sph.point_pos(ipoint));
+									 auto pos = cell.to_cartesian(sph.point_pos(ipoint));
 									 auto spinor_sph_harmomic = sharmonic::cartesian_spinor<complex>(twice_jj, twice_mj, twice_jj - 2*ll, pos[0], pos[1], pos[2]);
 									 auto radial = spline(sph.distance(ipoint));
 
@@ -245,7 +245,7 @@ public:
 													 return -2.0*oc[ist]*(real(red0*conj(gph[ip][ist][0])) + real(red1*conj(gph[ip][ist][1])));
 												 });
 
-		forces_non_local[iatom_] += phi.basis().volume_element()*phi.basis().cell().metric().to_cartesian(forc);
+		forces_non_local[iatom_] += phi.basis().volume_element()*phi.basis().cell().to_cartesian(forc);
 		
 	}
 	

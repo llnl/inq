@@ -59,7 +59,7 @@ public:
 	template <typename PhiType>
 	void zero_step(PhiType & phi) const {
 
-		auto cov_efield = phi.basis().cell().metric().to_covariant(efield_);
+		auto cov_efield = phi.basis().cell().to_covariant(efield_);
 		
 		gpu::run(phi.basis().local_sizes()[2], phi.basis().local_sizes()[1], phi.basis().local_sizes()[0],
 						 [pop = phi.basis().point_op(), ph = begin(phi.hypercubic()), cov_efield, nst = phi.set_part().local_size()] GPU_LAMBDA (auto iz, auto iy, auto ix){

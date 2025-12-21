@@ -120,7 +120,7 @@ namespace basis {
 									 
 									 (&buf[ix][iy][iz])->coords_ = {ixl, iyl, izl};
 									 (&buf[ix][iy][iz])->distance_ = sqrt(n2);
-									 (&buf[ix][iy][iz])->relative_pos_ = static_cast<vector3<float, contravariant>>(point_op.metric().to_contravariant(rpoint - re));
+									 (&buf[ix][iy][iz])->relative_pos_ = static_cast<vector3<float, contravariant>>(point_op.cell().to_contravariant(rpoint - re));
 								 });
 				
 				upper_count += cube_size;
