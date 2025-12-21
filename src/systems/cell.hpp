@@ -73,8 +73,7 @@ namespace systems {
 			return lattice_[ii];
 		}
     
-    vector_type const& lattice(int ii) const {
-			assert(ii >= 0 and ii < 3);
+    GPU_FUNCTION auto & lattice(int ii) const {
 			return lattice_[ii];
 		}
 		

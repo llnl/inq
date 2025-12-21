@@ -25,7 +25,7 @@ class singularity_correction {
 
 public:
 
-	static auto cell_projection(systems::cell const & cell, vector3<double, covariant> const & qpoint) {
+	GPU_FUNCTION static auto cell_projection(systems::cell const & cell, vector3<double, covariant> const & qpoint) {
 		vector3<double> dp3;
 		for(int jj = 0; jj < 3; jj++){
 			dp3[jj] = cell.dot(cell.lattice(jj), qpoint);
@@ -34,7 +34,7 @@ public:
 	}
 	
 	// the function defined in Eq. 16
-	static auto auxiliary(vector3<double> const & dp1, vector3<double> const & dp2, vector3<double> const & dp3){
+	GPU_FUNCTION static auto auxiliary(vector3<double> const & dp1, vector3<double> const & dp2, vector3<double> const & dp3){
 
 		double s0, s1, s2, c0, c1, c2;
 		sincos(dp3[0], &s0, &c0);
@@ -59,21 +59,20 @@ public:
 		return auxiliary(dp1, dp2, cell_projection(cell, qpoint));
 	}
 
+	GPU_FUNCTION static auto length(int istep) {
+		return 1.0/pow(3.0, istep);
+	}
+
 	double calculate_fzero(vector3<double> const & dp1, vector3<double> const & dp2, systems::cell const & cell) {
 
 		CALI_CXX_MARK_SCOPE("singularity_correction::fzero");
 		
 		auto const nsteps = 7;
 		auto const nk = 60;
-		
 		auto const kvol_element = pow(2.0*M_PI/(2.0*nk + 1.0), 3)/cell.volume();
 
-		auto length = [] (auto istep) {
-			return 1.0/pow(3.0, istep);
-		};
-
 		auto fzero = gpu::run(gpu::reduce(nk + 1), gpu::reduce(2*nk + 1), gpu::reduce(2*nk + 1), 0.0,
-											[nk, cell, length, dp1, dp2] GPU_LAMBDA (auto ikx, auto iky, auto ikz) {
+											[nk, cell, dp1, dp2] GPU_LAMBDA (auto ikx, auto iky, auto ikz) {
 												iky -= nk;
 												ikz -= nk;								 
 												
