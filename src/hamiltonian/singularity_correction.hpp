@@ -35,21 +35,19 @@ public:
 	
 	// the function defined in Eq. 16
 	static auto auxiliary(vector3<double> const & dp1, vector3<double> const & dp2, vector3<double> const & dp3){
-		
-		auto val = 0.0;
 
-		for(int jj = 0; jj < 3; jj++){
-			auto jjp1 = jj + 1;
-			if(jjp1 == 3) jjp1 = 0;
+		auto h0 = sin(0.5*dp3[0]);
+		auto h1 = sin(0.5*dp3[1]);
+		auto h2 = sin(0.5*dp3[2]);
 
-			auto s1 = sin(0.5*dp3[jj]);
-			auto s2 = sin(    dp3[jj]);
-			auto s3 = sin(    dp3[jjp1]);
-				
-			val += dp1[jj]*s1*s1 + dp2[jj]*s2*s3;
-		}
+		auto s0 = sin(dp3[0]);
+		auto s1 = sin(dp3[1]);
+		auto s2 = sin(dp3[2]);
+
+		auto v1 = dp1[0]*h0*h0 + dp1[1]*h1*h1 + dp1[2]*h2*h2;
+		auto v2 = dp2[0]*s0*s1 + dp2[1]*s1*s2 + dp2[1]*s2*s0;
 		
-		return 4*M_PI*M_PI/val;
+		return 4*M_PI*M_PI/(v1 + v2);
 	}
 	
 	static auto auxiliary(systems::cell const & cell, vector3<double, covariant> const & qpoint){
