@@ -186,7 +186,7 @@ namespace systems {
 		
 		template <class Type>
 			GPU_FUNCTION auto to_contravariant(vector3<Type, cartesian> const & vv) const {
-			return vector3<Type, contravariant>{reciprocal_[0].dot(vv), reciprocal_[1].dot(vv), reciprocal_[2].dot(vv)}/(2.0*M_PI);
+			return vector3<Type, contravariant>{reciprocal_[0].dot(vv), reciprocal_[1].dot(vv), reciprocal_[2].dot(vv)}*(0.5/M_PI);
 		}
 		
 		template <class Type>
@@ -201,7 +201,7 @@ namespace systems {
 		
 		template <class Type>
 		GPU_FUNCTION auto to_cartesian(vector3<Type, covariant> const & vv) const {
-			return (reciprocal_[0]*vv[0] + reciprocal_[1]*vv[1] + reciprocal_[2]*vv[2])/(2.0*M_PI);
+			return (reciprocal_[0]*vv[0] + reciprocal_[1]*vv[1] + reciprocal_[2]*vv[2])*(0.5/M_PI);
 		}
 
     bool contains(vector3<double, contravariant> point) const {

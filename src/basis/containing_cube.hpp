@@ -78,7 +78,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(lo[1] == -3);
 		CHECK(lo[2] == -6);
 		CHECK(hi[0] == 18);
-		CHECK(hi[1] == 16);
+		CHECK(hi[1] == 17);
 		CHECK(hi[2] == 13);		
 		
 		for(int ix = 0; ix < rs.sizes()[0]; ix++){
