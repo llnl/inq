@@ -62,7 +62,7 @@ public:
 		return 1.0/pow(3.0, istep);
 	}
 
-	double calculate_fzero(vector3<double> const & dp1, vector3<double> const & dp2, systems::cell const & cell) {
+	static double calculate_fzero(vector3<double> const & dp1, vector3<double> const & dp2, systems::cell const & cell) {
 
 		CALI_CXX_MARK_SCOPE("singularity_correction::fzero");
 		
@@ -94,9 +94,27 @@ public:
 		
 		return fzero;
 	}
+
+	static gpu::array<double, 1> calculate_fk(vector3<double> const & dp1, vector3<double> const & dp2, systems::cell const & cell, ionic::brillouin const & bzone) {
+		CALI_CXX_MARK_SCOPE("singularity_correction::fk");
+
+		auto fk = gpu::array<double, 1>(bzone.size());
+		
+		for(int ik = 0; ik < bzone.size(); ik++){
+			
+			fk[ik] = 0.0;
+			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
+				auto qpoint = bzone.kpoint(ik) - bzone.kpoint(ik2);
+				if(cell.norm(qpoint) < 1e-6) continue;
+				fk[ik] += bzone.kpoint_weight(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint));
+			}
+			fk[ik] *= 4.0*M_PI/cell.volume();
+		}
+
+		return fk;
+	}
 	
 	singularity_correction(systems::cell const & cell, ionic::brillouin const & bzone):
-		fk_(bzone.size()),
 		nkpoints_(bzone.size()),
 		cell_volume_(cell.volume())
 	{
@@ -109,19 +127,8 @@ public:
 			dp1[jj] = 4.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jj));
 			dp2[jj] = 2.0*cell.dot(cell.reciprocal(jj), cell.reciprocal(jjp1));
 		}
-		
-		for(int ik = 0; ik < bzone.size(); ik++){
-			CALI_CXX_MARK_SCOPE("singularity_correction::fk");
-			
-			fk_[ik] = 0.0;
-			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
-				auto qpoint = bzone.kpoint(ik) - bzone.kpoint(ik2);
-				if(cell.norm(qpoint) < 1e-6) continue;
-				fk_[ik] += bzone.kpoint_weight(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint));
-			}
-			fk_[ik] *= 4.0*M_PI/cell.volume();
-		}
 
+		fk_ = calculate_fk(dp1, dp2, cell, bzone);
 		fzero_ = calculate_fzero(dp1, dp2, cell);
 	}
 
