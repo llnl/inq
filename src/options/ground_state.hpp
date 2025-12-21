@@ -10,7 +10,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <magnitude/energy.hpp>
-#include <utils/merge_optional.hpp>
 
 #include <optional>
 #include <cassert>

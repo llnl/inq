@@ -25,6 +25,8 @@ namespace observables {
 template <typename HamiltonianType>
 basis::field<basis::real_space, vector3<double, covariant>> current_density(const systems::ions & ions, systems::electrons const & electrons, HamiltonianType const & ham){
 
+	CALI_CXX_MARK_FUNCTION;
+	
 	basis::field<basis::real_space, vector3<double, covariant>> cdensity(electrons.density_basis());
 	cdensity.fill(vector3<double, covariant>{0.0, 0.0, 0.0});
 
@@ -71,7 +73,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 	auto par = input::parallelization(comm);
 
-	{
+	SECTION("Gamma - no atoms") {
+			
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		systems::electrons electrons(par, ions, options::electrons{}.cutoff(15.0_Ha).extra_electrons(20.0));
 
@@ -82,7 +85,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("Gamma - no atoms"){
+		{
 
 			ham.uniform_vector_potential() = vector3<double, covariant>{0.0, 0.0, 0.0};
 			
@@ -102,7 +105,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			
 		}
 
-		SECTION("Gamma - no atoms - zero paramagnetic"){
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -130,13 +134,13 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 	}
 
-	{
+	SECTION("1/4 1/4 1/4 - no atoms") {
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		systems::electrons electrons(par, ions, options::electrons{}.cutoff(15.0_Ha).extra_electrons(20.0), input::kpoints::point(0.25, 0.25, 0.25));
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("1/4 1/4 1/4 - no atoms"){
+		{
 			
 			auto cur = observables::current(ions, electrons, ham);
 
@@ -156,7 +160,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			
 		}
 
-		SECTION("1/4 1/4 1/4 - no atoms - zero paramagnetic"){
+
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -184,7 +190,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 	}
 
-	{
+	SECTION("Gamma - atoms") {
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		ions.insert("Cu", {0.0_b, 0.0_b, 0.0_b});
 		ions.insert("Ag", {2.0_b, 0.7_b, 0.0_b});	
@@ -192,7 +198,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("Gamma - atoms"){
+		{
 
 			ham.uniform_vector_potential() = vector3<double, covariant>{0.0, 0.0, 0.0};
 			
@@ -212,7 +218,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			
 		}
 
-		SECTION("Gamma - atoms - zero paramagnetic"){
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -235,7 +242,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 	}
 
-	{
+	SECTION("1/4 1/4 1/4 - atoms"){
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		ions.insert("Cu", {0.0_b, 0.0_b, 0.0_b});
 		ions.insert("Ag", {2.0_b, 0.7_b, 0.0_b});	
@@ -243,7 +250,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("Gamma - atoms"){
+		{
 
 			ham.uniform_vector_potential() = vector3<double, covariant>{0.0, 0.0, 0.0};
 			
@@ -263,7 +270,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			
 		}
 
-		SECTION("Gamma - atoms - zero paramagnetic"){
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -285,7 +293,6 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			
 		}
 	}
-
 	
 }
 #endif

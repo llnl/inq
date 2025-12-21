@@ -36,15 +36,15 @@ namespace hamiltonian {
 		std::vector<states::orbital_set<basis::real_space, complex>> ace_orbitals_;
 		double exchange_coefficient_;
 		bool use_ace_;
-		singularity_correction sing_;
+		std::optional<singularity_correction> sing_;
 		states::index orbital_index_;
 		
   public:
 
 		exchange_operator(systems::cell const & cell, ionic::brillouin const & bzone, double const exchange_coefficient, bool const use_ace):
 			exchange_coefficient_(exchange_coefficient),
-			use_ace_(use_ace),
-			sing_(cell, bzone){
+			use_ace_(use_ace){
+			if(enabled()) sing_.emplace(cell, bzone);
 		}
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -148,7 +148,7 @@ namespace hamiltonian {
 									 });
 				}
 
-				solvers::poisson::in_place(rhoij, -phi.kpoint() + kpt[jj], sing_(idx[jj]));
+				solvers::poisson::in_place(rhoij, -phi.kpoint() + kpt[jj], (*sing_)(idx[jj]));
 				
 				{ CALI_CXX_MARK_SCOPE("exchange_operator::mulitplication");
 					gpu::run(nst, exxphi.basis().local_size(),

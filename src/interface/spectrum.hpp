@@ -11,7 +11,6 @@
 
 #include <input/environment.hpp>
 #include <ground_state/initial_guess.hpp>
-#include <ground_state/calculate.hpp>
 #include <real_time/propagate.hpp>
 #include <real_time/results.hpp>
 
