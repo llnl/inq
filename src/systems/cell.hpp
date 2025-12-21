@@ -144,86 +144,6 @@ namespace systems {
 			return *this;
 		}
 		
-		class cell_metric {
-
-			vector3<double, cartesian> lat_[3];
-			vector3<double, cartesian> rlat_[3];
-
-		public:
-
-			template <class AType, class BType>
-			cell_metric(AType const & aa, BType const & bb){
-				for(int ii = 0; ii < 3; ii++){
-					for(int jj = 0; jj < 3; jj++){
-						lat_[ii][jj] = aa[ii][jj];
-						rlat_[ii][jj] = bb[ii][jj]/(2.0*M_PI);
-					}
-				}
-
-			}
-
-			template <class Type1, class Space1, class Type2, class Space2>
-			GPU_FUNCTION auto dot(vector3<Type1, Space1> const & vv1, vector3<Type2, Space2> const & vv2) const {
-				return to_cartesian(vv1).dot(to_cartesian(vv2));
-			}
-			
-			template <class Type, class Space>
-			GPU_FUNCTION auto norm(vector3<Type, Space> const & vv) const {
-				return real(dot(vv, vv));
-			}
-
-			template <class Type, class Space>
-			GPU_FUNCTION auto length(vector3<Type, Space> const & vv) const {
-				return sqrt(norm(vv));
-			}
-
-			template <class Type>
-			GPU_FUNCTION auto to_covariant(vector3<Type, covariant> const & vv) const {
-				return vv;
-			}
-			
-			template <class Type>
-			GPU_FUNCTION auto to_covariant(vector3<Type, cartesian> const & vv) const {
-				return vector3<Type, covariant>{lat_[0].dot(vv), lat_[1].dot(vv), lat_[2].dot(vv)};
-			}
-
-			template <class Type>
-			GPU_FUNCTION auto to_covariant(vector3<Type, contravariant> const & vv) const {
-				return to_covariant(to_cartesian(vv));
-			}
-
-			template <class Type>
-			GPU_FUNCTION auto to_contravariant(vector3<Type, contravariant> const & vv) const {
-				return vv;
-			}
-			
-			template <class Type>
-			GPU_FUNCTION auto to_contravariant(vector3<Type, covariant> const & vv) const {
-				return to_contravariant(to_cartesian(vv));
-			}
-
-			template <class Type>
-			GPU_FUNCTION auto to_contravariant(vector3<Type, cartesian> const & vv) const {
-				return vector3<Type, contravariant>{rlat_[0].dot(vv), rlat_[1].dot(vv), rlat_[2].dot(vv)};
-			}
-
-			template <class Type>
-			GPU_FUNCTION auto to_cartesian(vector3<Type, cartesian> const & vv) const {
-				return vv;
-			}
-			
-			template <class Type>
-			GPU_FUNCTION auto to_cartesian(vector3<Type, contravariant> const & vv) const {
-				return lat_[0]*vv[0] + lat_[1]*vv[1] + lat_[2]*vv[2];
-			}
-			
-			template <class Type>
-			GPU_FUNCTION auto to_cartesian(vector3<Type, covariant> const & vv) const {
-				return (rlat_[0]*vv[0] + rlat_[1]*vv[1] + rlat_[2]*vv[2]);
-			}
-			
-		};
-		
 		template <class Type1, class Space1, class Type2, class Space2>
 		GPU_FUNCTION auto dot(vector3<Type1, Space1> const & vv1, vector3<Type2, Space2> const & vv2) const {
 			return to_cartesian(vv1).dot(to_cartesian(vv2));
@@ -283,17 +203,13 @@ namespace systems {
 		GPU_FUNCTION auto to_cartesian(vector3<Type, covariant> const & vv) const {
 			return (reciprocal_[0]*vv[0] + reciprocal_[1]*vv[1] + reciprocal_[2]*vv[2])/(2.0*M_PI);
 		}
-		
-		auto metric() const {
-			return cell_metric{lattice_, reciprocal_};
-		}
 
     bool contains(vector3<double, contravariant> point) const {
 			return point[0] >= -0.5 && point[0] < 0.5 && point[1] >= -0.5 && point[1] < 0.5 && point[2] >= -0.5 && point[2] <= 0.5;
 		}
 
 		bool contains(vector3<double> point) const {
-			return contains(metric().to_contravariant(point));
+			return contains(to_contravariant(point));
 		}
 		
 		auto position_in_cell(vector3<double, contravariant> crystal_pos) const {
@@ -306,8 +222,8 @@ namespace systems {
 		}
 		
 		auto position_in_cell(vector3<double> const & pos) const {
-			auto crystal_pos = metric().to_contravariant(pos);
-			return metric().to_cartesian(position_in_cell(crystal_pos));
+			auto crystal_pos = to_contravariant(pos);
+			return to_cartesian(position_in_cell(crystal_pos));
 		}
 
 		auto is_orthogonal() const {

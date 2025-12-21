@@ -200,10 +200,10 @@ public:
 			basis::field_set<basis::real_space, double> vsig(sig.skeleton());
 
 			gpu::run(density.basis().local_size(),
-							 [gr = begin(density_gradient->matrix()), si = begin(sig.matrix()), metric = density.basis().cell().metric(), nsig] GPU_LAMBDA (auto ip){
-								 si[ip][0] = metric.norm(gr[ip][0]);
-								 if(nsig > 1) si[ip][1] = metric.dot(gr[ip][0], gr[ip][1]);
-								 if(nsig > 1) si[ip][2] = metric.norm(gr[ip][1]);
+							 [gr = begin(density_gradient->matrix()), si = begin(sig.matrix()), cell = density.basis().cell(), nsig] GPU_LAMBDA (auto ip){
+								 si[ip][0] = cell.norm(gr[ip][0]);
+								 if(nsig > 1) si[ip][1] = cell.dot(gr[ip][0], gr[ip][1]);
+								 if(nsig > 1) si[ip][2] = cell.norm(gr[ip][1]);
 							 });
 
 			xc_gga_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(), raw_pointer_cast(density.matrix().data_elements()), raw_pointer_cast(sig.matrix().data_elements()),

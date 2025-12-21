@@ -104,15 +104,15 @@ public:
 		std::array<int, 3> sizes_;
 		vector3<double, contravariant> rspacing_;
 		std::array<inq::parallel::partition, 3> cubic_part_;
-		systems::cell::cell_metric metric_;
+		systems::cell cell_;
 
 	public:
 
-		point_operator(std::array<int, 3> const & nr, vector3<double, contravariant> const & rspacing, std::array<inq::parallel::partition, 3> const & dist, systems::cell::cell_metric metric):
+		point_operator(std::array<int, 3> const & nr, vector3<double, contravariant> const & rspacing, std::array<inq::parallel::partition, 3> const & dist, systems::cell cell):
 			sizes_(nr),
 			rspacing_(rspacing),
 			cubic_part_(dist),
-			metric_(metric)
+			cell_(cell)
 		{
 		}
 
@@ -138,11 +138,11 @@ public:
 		}
 
 		GPU_FUNCTION auto rvector_cartesian(int ix, int iy, int iz) const {
-			return metric_.to_cartesian(rvector(ix, iy, iz));
+			return cell_.to_cartesian(rvector(ix, iy, iz));
 		}
 
 		GPU_FUNCTION auto rvector_cartesian(parallel::global_index ix, parallel::global_index iy, parallel::global_index iz) const {
-			return metric_.to_cartesian(rvector(ix, iy, iz));
+			return cell_.to_cartesian(rvector(ix, iy, iz));
 		}
 			
 		template <class int_array>
@@ -152,20 +152,20 @@ public:
 			
 		template <typename IndexType>
 		GPU_FUNCTION double r2(IndexType ix, IndexType iy, IndexType iz) const {
-			return metric_.norm(rvector(ix, iy, iz));
+			return cell_.norm(rvector(ix, iy, iz));
 		}
 
 		template <typename IndexType>
 		GPU_FUNCTION double rlength(IndexType ix, IndexType iy, IndexType iz) const {
-			return metric_.length(rvector(ix, iy, iz));
+			return cell_.length(rvector(ix, iy, iz));
 		}
 			
 		GPU_FUNCTION auto & cubic_part(int idim) const {
 			return cubic_part_[idim];
 		}
 			
-		GPU_FUNCTION auto & metric() const {
-			return metric_;
+		GPU_FUNCTION auto & cell() const {
+			return cell_;
 		}
 			
 		GPU_FUNCTION auto local_contains(vector3<int> const & ii) const {
@@ -224,7 +224,7 @@ public:
 	}
 
 	auto point_op() const {
-		return point_operator(sizes_, conspacing_, cubic_part_, cell_.metric());
+		return point_operator(sizes_, conspacing_, cubic_part_, cell_);
 	}
 
 	template <typename ReciprocalBasis = reciprocal_space>

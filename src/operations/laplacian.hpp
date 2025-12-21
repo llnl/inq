@@ -90,7 +90,7 @@ gpu::array<double, 1> laplacian_expectation_value(FieldSetType & ff, FactorType 
 	static_assert(std::is_same_v<typename FieldSetType::basis_type, basis::fourier_space>, "Only implemented for fourier_space");
 
 	
-	auto k2 = -0.25*ff.basis().cell().metric().dot(gradcoeff, gradcoeff);
+	auto k2 = -0.25*ff.basis().cell().dot(gradcoeff, gradcoeff);
 	
 	auto evs = gpu::run(ff.local_set_size(), gpu::reduce(ff.basis().local_sizes()[2]), gpu::reduce(ff.basis().local_sizes()[1]), gpu::reduce(ff.basis().local_sizes()[0]), 0.0,
 											[point_op = ff.basis().point_op(), ffcub = begin(ff.hypercubic()), fac = factor*ff.basis().volume_element(), gradcoeff, k2]
@@ -226,7 +226,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			return -norm(kk)*ff(kk, rr);
 		};
 
-		CHECK(norm(kvec) == Approx(rs.cell().metric().norm(rs.cell().metric().to_covariant(kvec))));
+		CHECK(norm(kvec) == Approx(rs.cell().norm(rs.cell().to_covariant(kvec))));
 		
 		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
@@ -280,7 +280,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		
 		basis::field_set<basis::real_space, complex> func(rs, 13, cart_comm);
 	
-		auto kvec = rs.cell().metric().to_cartesian(2.0*rs.cell().reciprocal(2) + 3.0*rs.cell().reciprocal(2) - 1.0*rs.cell().reciprocal(2));
+		auto kvec = rs.cell().to_cartesian(2.0*rs.cell().reciprocal(2) + 3.0*rs.cell().reciprocal(2) - 1.0*rs.cell().reciprocal(2));
 		
 		auto ff = [] (auto & kk, auto & rr){
 			return exp(inq::complex(0.0, 1.0)*dot(kk, rr));
@@ -290,7 +290,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			return -norm(kk)*ff(kk, rr);
 		};
 
-		CHECK(norm(kvec) == Approx(rs.cell().metric().norm(rs.cell().metric().to_covariant(kvec))));
+		CHECK(norm(kvec) == Approx(rs.cell().norm(rs.cell().to_covariant(kvec))));
 		
 		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){

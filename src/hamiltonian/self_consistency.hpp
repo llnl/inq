@@ -157,7 +157,7 @@ public:
 		// THE VECTOR POTENTIAL
 		
 		if(pert_.has_uniform_vector_potential()){
-			hamiltonian.uniform_vector_potential_ = potential_basis_.cell().metric().to_covariant(pert_.uniform_vector_potential(time));
+			hamiltonian.uniform_vector_potential_ = potential_basis_.cell().to_covariant(pert_.uniform_vector_potential(time));
 		} else {
 			hamiltonian.uniform_vector_potential_ = {0.0, 0.0, 0.0};
 		}

@@ -199,7 +199,7 @@ public:
 		
 		for(int iatom = 0; iatom < size(); iatom++){
 			types[iatom] = species(iatom).atomic_number();
-			auto pos = cell_.metric().to_contravariant(cell_.position_in_cell(positions()[iatom]));
+			auto pos = cell_.to_contravariant(cell_.position_in_cell(positions()[iatom]));
 			lin_pos[3*iatom + 0] = pos[0];
 			lin_pos[3*iatom + 1] = pos[1];
 			lin_pos[3*iatom + 2] = pos[2];
@@ -229,7 +229,7 @@ public:
 	}
 	
 	void insert_fractional(ionic::species const & sp, vector3<double, contravariant> const & pos){
-		add_atom(sp, cell_.metric().to_cartesian(pos));
+		add_atom(sp, cell_.to_cartesian(pos));
 	}
 
 	void remove(long index) {

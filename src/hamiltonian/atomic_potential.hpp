@@ -153,9 +153,9 @@ namespace hamiltonian {
 										sph = sphere.ref(),
 										spline = ps.short_range_potential().function(),
 										dg = double_grid_.ref(),
-										spac = basis.rspacing(), metric = basis.cell().metric()] GPU_LAMBDA (auto ipoint){
+										spac = basis.rspacing(), cell = basis.cell()] GPU_LAMBDA (auto ipoint){
 										 gpu::atomic::add(&pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]],
-																			dg.value([spline] GPU_LAMBDA (auto pos) { return spline(pos.length()); }, spac, metric.to_cartesian(sph.point_pos(ipoint))));
+																			dg.value([spline] GPU_LAMBDA (auto pos) { return spline(pos.length()); }, spac, cell.to_cartesian(sph.point_pos(ipoint))));
 									 });
 				}
 			}
@@ -347,7 +347,7 @@ namespace hamiltonian {
 														 return vv*grad;
 													 });
 
-				forces[iatom] = basis.volume_element()*basis.cell().metric().to_cartesian(ff);
+				forces[iatom] = basis.volume_element()*basis.cell().to_cartesian(ff);
 			}
 
 			if(basis.comm().size() > 1) {

@@ -110,7 +110,7 @@ public:
 				auto duplicated = false;
 				
 				for(int jatom = 0; jatom < (int) symbols.size(); jatom++){
-					if(cell.metric().norm(symm_pos - positions_[jatom]) > 1e-8) continue;
+					if(cell.norm(symm_pos - positions_[jatom]) > 1e-8) continue;
 					
 					if(symbol != symbols[jatom]) throw std::runtime_error("Error: the file '" + cif_file_name + "' contains two different atoms in the same position.");
 					duplicated = true;
