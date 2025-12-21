@@ -58,6 +58,44 @@ public:
 		
 		return auxiliary(dp1, dp2, cell_projection(cell, qpoint));
 	}
+
+	double calculate_fzero(vector3<double> const & dp1, vector3<double> const & dp2, systems::cell const & cell) {
+
+		CALI_CXX_MARK_SCOPE("singularity_correction::fzero");
+		
+		auto const nsteps = 7;
+		auto const nk = 60;
+		
+		auto const kvol_element = pow(2.0*M_PI/(2.0*nk + 1.0), 3)/cell.volume();
+
+		auto length = [] (auto istep) {
+			return 1.0/pow(3.0, istep);
+		};
+
+		auto fzero = gpu::run(gpu::reduce(nk + 1), gpu::reduce(2*nk + 1), gpu::reduce(2*nk + 1), 0.0,
+											[nk, cell, length, dp1, dp2] GPU_LAMBDA (auto ikx, auto iky, auto ikz) {
+												iky -= nk;
+												ikz -= nk;								 
+												
+												if(3*ikx <= nk and 3*std::abs(iky) <= nk and 3*std::abs(ikz) <= nk) return 0.0;
+												
+												auto qpoint = (M_PI/nk)*vector3<int, covariant>(ikx, iky, ikz);
+												auto dp3 = cell_projection(cell, qpoint);
+
+												auto psum = 0.0;
+												for(int istep = 0; istep < nsteps; istep++){
+													auto ll = length(istep);
+													psum += ll*ll*ll*auxiliary(dp1, dp2, dp3*ll);
+												}
+
+												return psum;
+											});
+
+		fzero *= 8.0*M_PI/pow(2.0*M_PI, 3)*kvol_element;
+		fzero += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length(nsteps - 1);
+		
+		return fzero;
+	}
 	
 	singularity_correction(systems::cell const & cell, ionic::brillouin const & bzone):
 		fk_(bzone.size()),
@@ -86,40 +124,7 @@ public:
 			fk_[ik] *= 4.0*M_PI/cell.volume();
 		}
 
-		auto const nsteps = 7;
-		auto const nk = 60;
-		
-		auto const kvol_element = pow(2.0*M_PI/(2.0*nk + 1.0), 3)/cell.volume();
-
-		auto length = [] (auto istep) {
-			return 1.0/pow(3.0, istep);
-		};
-
-		{
-			CALI_CXX_MARK_SCOPE("singularity_correction::fzero");
-
-		fzero_ = gpu::run(gpu::reduce(nk + 1), gpu::reduce(2*nk + 1), gpu::reduce(2*nk + 1), 0.0,
-											[nk, cell, length, dp1, dp2] GPU_LAMBDA (auto ikx, auto iky, auto ikz) {
-												iky -= nk;
-												ikz -= nk;								 
-												
-												if(3*ikx <= nk and 3*std::abs(iky) <= nk and 3*std::abs(ikz) <= nk) return 0.0;
-												
-												auto qpoint = (M_PI/nk)*vector3<int, covariant>(ikx, iky, ikz);
-												auto dp3 = cell_projection(cell, qpoint);
-
-												auto psum = 0.0;
-												for(int istep = 0; istep < nsteps; istep++){
-													auto ll = length(istep);
-													psum += ll*ll*ll*auxiliary(dp1, dp2, dp3*ll);
-												}
-
-												return psum;
-											});
-
-			fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3)*kvol_element;
-			fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length(nsteps - 1);
-		}
+		fzero_ = calculate_fzero(dp1, dp2, cell);
 	}
 
 	auto fk(int ik) const {
