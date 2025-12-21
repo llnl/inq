@@ -30,16 +30,11 @@ void containing_cube(basis::real_space const & grid, vector3<double> const & pos
 		lo[idir] = lround(floor(dlo/grid.contravariant_spacing()[idir]));
 		hi[idir] = lround(ceil(dhi/grid.contravariant_spacing()[idir])) + 1;
 
-		#if defined(__cpp_lib_clamp) and  (__cpp_lib_clamp >= 201603L)
-		lo[idir] = std::clamp(lo[idir], grid.symmetric_range_begin(idir), grid.symmetric_range_end(idir));
-		hi[idir] = std::clamp(hi[idir], grid.symmetric_range_begin(idir), grid.symmetric_range_end(idir));
-		#else
 		lo[idir] = std::max(lo[idir], grid.symmetric_range_begin(idir));
 		lo[idir] = std::min(lo[idir], grid.symmetric_range_end  (idir));
 
 		hi[idir] = std::max(hi[idir], grid.symmetric_range_begin(idir));
 		hi[idir] = std::min(hi[idir], grid.symmetric_range_end  (idir));
-		#endif
 	}
 	
 }
