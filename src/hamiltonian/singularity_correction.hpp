@@ -75,6 +75,7 @@ public:
 		}
 		
 		for(int ik = 0; ik < bzone.size(); ik++){
+			CALI_CXX_MARK_SCOPE("singularity_correction::fk");
 			
 			fk_[ik] = 0.0;
 			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
@@ -94,26 +95,30 @@ public:
 		auto length = [] (auto istep) {
 			return 1.0/pow(3.0, istep);
 		};
-		
-		for(auto ikx = 0; ikx <= nk; ikx++){
-			for(auto iky = -nk; iky <= nk; iky++){
-				for(auto ikz = -nk; ikz <= nk; ikz++){
-					if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
 
-					auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)/(2.0*nk);
-					auto dp3 = cell_projection(cell, qpoint);
-					
-					for(int istep = 0; istep < nsteps; istep++){
-						auto ll = length(istep);
-						fzero_ += kvol_element*pow(ll, 3)*auxiliary(dp1, dp2, dp3*ll);
+		{
+			CALI_CXX_MARK_SCOPE("singularity_correction::fzero");
+			
+			for(auto ikx = 0; ikx <= nk; ikx++){
+				for(auto iky = -nk; iky <= nk; iky++){
+					for(auto ikz = -nk; ikz <= nk; ikz++){
+						if(fabs(ikx) <= nk/3 and fabs(iky) <= nk/3 and fabs(ikz) <= nk/3) continue;
+						
+						auto qpoint = 2.0*M_PI*vector3<int, covariant>(ikx, iky, ikz)/(2.0*nk);
+						auto dp3 = cell_projection(cell, qpoint);
+						
+						for(int istep = 0; istep < nsteps; istep++){
+							auto ll = length(istep);
+							fzero_ += kvol_element*pow(ll, 3)*auxiliary(dp1, dp2, dp3*ll);
+						}
+						
 					}
-
 				}
 			}
-		}
 
-		fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3);
-		fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length(nsteps - 1);
+			fzero_ *= 8.0*M_PI/pow(2.0*M_PI, 3);
+			fzero_ += 4.0*M_PI*pow(3.0/(4.0*M_PI), 1.0/3.0)*pow(cell.volume(), 2.0/3.0)/M_PI/cell.volume()*length(nsteps - 1);
+		}
 	}
 
 	auto fk(int ik) const {
