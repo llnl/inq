@@ -25,9 +25,10 @@ namespace systems {
 
   class cell{
 		using vector_type = vector3<double>;
+
   private:
-		std::array<vector_type, 3> lattice_;
-    std::array<vector_type, 3> reciprocal_;
+		vector3<vector_type> lattice_;
+		vector3<vector_type> reciprocal_;
     double volume_;
 		int periodicity_;
 		
