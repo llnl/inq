@@ -26,11 +26,10 @@ class singularity_correction {
 public:
 
 	GPU_FUNCTION static auto cell_projection(systems::cell const & cell, vector3<double, covariant> const & qpoint) {
-		vector3<double> dp3;
-		for(int jj = 0; jj < 3; jj++){
-			dp3[jj] = cell.dot(cell.lattice(jj), qpoint);
-		}
-		return dp3;
+		auto qp_cart = cell.to_cartesian(qpoint);
+		return vector3<double>{dot(cell.lattice(0), qp_cart),
+													 dot(cell.lattice(1), qp_cart),
+													 dot(cell.lattice(2), qp_cart)};
 	}
 	
 	// the function defined in Eq. 16
