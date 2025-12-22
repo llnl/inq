@@ -27,7 +27,7 @@ endforeach()
 file(GLOB PYTHON_TESTS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.py)
 
 foreach(TEST_FILE ${PYTHON_TESTS})
-  add_test(NAME inq::tests::${TEST_FILE} COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE})
+  add_test(NAME inq::tests::${TEST_FILE} COMMAND ${PROJECT_BINARY_DIR}/scripts/run_test.sh ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE})
   set_property(TEST inq::tests::${TEST_FILE} PROPERTY ENVIRONMENT_MODIFICATION "${INQ_PATHS}")
 endforeach()
 
