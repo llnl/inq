@@ -346,53 +346,42 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		field<real_space, complex> density(rs);
 		field_set<real_space, complex> density_set(rs, nst);
 
-		{
-
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-						density.cubic()[ix][iy][iz] = 0.0;
-						for(int ist = 0; ist < nst; ist++) density_set.hypercubic()[ix][iy][iz][ist] = 0.0;
-						if(rs.point_op().r2(ix, iy, iz) < 1e-10) {
-							density.cubic()[ix][iy][iz] = -1.0/rs.volume_element();
-							for(int ist = 0; ist < nst; ist++) density_set.hypercubic()[ix][iy][iz][ist] = -(1.0 + ist)/rs.volume_element();
-						}
-					}
-				}
-			}
+		gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+						 [dens = begin(density.cubic()), dset = begin(density_set.hypercubic()), point_op = rs.point_op(), vol_el = rs.volume_element()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+								 
+							 dens[ix][iy][iz] = 0.0;
+							 for(int ist = 0; ist < nst; ist++) dset[ix][iy][iz][ist] = 0.0;
+							 if(point_op.r2(ix, iy, iz) < 1e-10) {
+								 dens[ix][iy][iz] = -1.0/vol_el;
+								 for(int ist = 0; ist < nst; ist++) dset[ix][iy][iz][ist] = -(1.0 + ist)/vol_el;
+							 }
+						 });
 
 			CHECK(real(operations::integral(density)) == -1.0_a);
 			
 			auto potential = solvers::poisson::solve(density);
 			solvers::poisson::in_place(density_set);
 
-
-			auto errors_field     = 0;
-			auto errors_field_set = 0;
+			auto errors = gpu::array<int, 1>(2, 0);
 			
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					 
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);
+			gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+							 [pot = begin(potential.cubic()), dset = begin(density_set.hypercubic()), point_op = rs.point_op(),
+								part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2), er = begin(errors)] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 
-						auto rr = rs.point_op().rlength(ixg, iyg, izg);
+								 auto ixg = part0.local_to_global(ix);
+								 auto iyg = part1.local_to_global(iy);
+								 auto izg = part2.local_to_global(iz);
+											 
+								 auto rr = point_op.rlength(ixg, iyg, izg);
 
-						// it should be close to -1/r
-						if(rr > 1) {
-							if(fabs(potential.cubic()[ix][iy][iz]*rr + 1.0) >= 0.025) errors_field++;
-							for(int ist = 0; ist < nst; ist++) if(fabs(density_set.hypercubic()[ix][iy][iz][ist]*rr/(1.0 + ist) + 1.0) >= 0.025) errors_field_set++;
-						}
-						
-					}
-				}
-			}
+								 // it should be close to -1/r
+								 if(rr <= 1) return;
+								 if(fabs(pot[ix][iy][iz]*rr + 1.0) >= 0.025) gpu::atomic(er[0])++;
+								 for(int ist = 0; ist < nst; ist++) if(fabs(dset[ix][iy][iz][ist]*rr/(1.0 + ist) + 1.0) >= 0.025) gpu::atomic(er[1])++;
+							 });
 
-			CHECK(errors_field     == 0);
-			CHECK(errors_field_set == 0);
-		}
+			CHECK(errors[0] == 0);
+			CHECK(errors[1] == 0);
 	}
 
 	SECTION("Point charge 2d periodic"){
@@ -409,24 +398,24 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		
 		field<real_space, complex> density(rs);
 		field_set<real_space, complex> density_set(rs, nst);
-		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					density.cubic()[ix][iy][iz] = 0.0;
-					for(int ist = 0; ist < nst; ist++) density_set.hypercubic()[ix][iy][iz][ist] = 0.0;
-					if(rs.point_op().r2(ix, iy, iz) < 1e-10) {
-						density.cubic()[ix][iy][iz] = -1.0/rs.volume_element();
-						for(int ist = 0; ist < nst; ist++) density_set.hypercubic()[ix][iy][iz][ist] = -(1.0 + ist)/rs.volume_element();
-					}
-				}
-			}
-		}
+
+		gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+						 [dens = begin(density.cubic()), dset = begin(density_set.hypercubic()), point_op = rs.point_op(), vol_el = rs.volume_element()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+							 
+							 dens[ix][iy][iz] = 0.0;
+							 for(int ist = 0; ist < nst; ist++) dset[ix][iy][iz][ist] = 0.0;
+							 if(point_op.r2(ix, iy, iz) < 1e-10) {
+								 dens[ix][iy][iz] = -1.0/vol_el;
+								 for(int ist = 0; ist < nst; ist++) dset[ix][iy][iz][ist] = -(1.0 + ist)/vol_el;
+							 }
+						 });
 		
 		CHECK(real(operations::integral(density)) == -1.0_a);
 		
 		auto potential = solvers::poisson::solve(density);
 		solvers::poisson::in_place(density_set);
+
+		//MISSING: CHECKING THE RESULTS
 	}
 }
 #endif
