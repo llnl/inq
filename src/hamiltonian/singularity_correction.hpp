@@ -107,19 +107,18 @@ public:
 			weights[ik] = 4.0*M_PI/cell.volume()*bzone.kpoint_weight(ik);
 			kpoints[ik] = cell.to_cartesian(bzone.kpoint(ik));
 		}
-		
-		for(int ik = 0; ik < bzone.size(); ik++){
-			for(int jk = 0; jk < bzone.size(); jk++){
-				if(jk <= ik) continue;
-				
-				auto qpoint = kpoints(ik) - kpoints(jk);
-				if(cell.norm(qpoint) < 1e-6) continue;
-				auto aux = auxiliary(dp1, dp2, cell_projection(cell, qpoint));
-				//  cell_projection is odd, and auxiliary is odd (with respect to the 3rd argument) so we can use aux for both case
-				foka[ik] += weights(jk)*aux;
-				foka[jk] += weights(ik)*aux;
-			}
-		}
+
+		gpu::run(bzone.size(), bzone.size(),
+						 [dp1, dp2, fk = begin(foka), we = begin(weights), kp = begin(kpoints), cell] GPU_LAMBDA (auto jk, auto ik) {
+							 if(jk <= ik) return;
+							 
+							 auto qpoint = kp[ik] - kp[jk];
+							 if(cell.norm(qpoint) < 1e-6) return;
+							 auto aux = auxiliary(dp1, dp2, cell_projection(cell, qpoint));
+							 //  cell_projection is odd, and auxiliary is odd (with respect to the 3rd argument) so we can use aux for both cases
+							 gpu::atomic::add(&fk[ik], we[jk]*aux);
+							 gpu::atomic::add(&fk[jk], we[ik]*aux);
+						 });
 
 		return foka;
 	}
