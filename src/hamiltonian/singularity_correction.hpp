@@ -25,7 +25,8 @@ class singularity_correction {
 
 public:
 
-	GPU_FUNCTION static auto cell_projection(systems::cell const & cell, vector3<double, covariant> const & qpoint) {
+	template <class Vector3>
+	GPU_FUNCTION static auto cell_projection(systems::cell const & cell, Vector3 const & qpoint) {
 		auto qp_cart = cell.to_cartesian(qpoint);
 		return vector3<double>{dot(cell.lattice(0), qp_cart),
 													 dot(cell.lattice(1), qp_cart),
@@ -98,20 +99,26 @@ public:
 	static gpu::array<double, 1> calculate_fk(vector3<double> const & dp1, vector3<double> const & dp2, systems::cell const & cell, ionic::brillouin const & bzone) {
 		CALI_CXX_MARK_SCOPE("singularity_correction::fk");
 
-		auto fk = gpu::array<double, 1>(bzone.size());
+		auto foka    = gpu::array<double, 1>(bzone.size(), 0.0);
+		auto weights = gpu::array<double, 1>(bzone.size());
+		auto kpoints = gpu::array<vector3<double>, 1>(bzone.size());
+
+		for(int ik = 0; ik < bzone.size(); ik++){
+			weights[ik] = 4.0*M_PI/cell.volume()*bzone.kpoint_weight(ik);
+			kpoints[ik] = cell.to_cartesian(bzone.kpoint(ik));
+		}
 		
 		for(int ik = 0; ik < bzone.size(); ik++){
 			
-			fk[ik] = 0.0;
+			foka[ik] = 0.0;
 			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
-				auto qpoint = bzone.kpoint(ik) - bzone.kpoint(ik2);
+				auto qpoint = kpoints(ik) - kpoints(ik2);
 				if(cell.norm(qpoint) < 1e-6) continue;
-				fk[ik] += bzone.kpoint_weight(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint));
+				foka[ik] += weights(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint));
 			}
-			fk[ik] *= 4.0*M_PI/cell.volume();
 		}
 
-		return fk;
+		return foka;
 	}
 	
 	singularity_correction(systems::cell const & cell, ionic::brillouin const & bzone):
@@ -213,9 +220,16 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 		CHECK(sing.fzero() == 0.6557402601_a);
 
-		CHECK(sing.fk(32*32*32 - 1) == 0.6397684561_a);
+		CHECK(sing.fk(    0) == 0.6397684561_a);
+		CHECK(sing.fk(   25) == 0.6397684561_a);
+		CHECK(sing.fk(  369) == 0.6397684561_a);
+		CHECK(sing.fk( 1331) == 0.6397684561_a);
+		CHECK(sing.fk(10789) == 0.6397684561_a);
+		CHECK(sing.fk(20334) == 0.6397684561_a);
+		CHECK(sing.fk(29000) == 0.6397684561_a);
+		CHECK(sing.fk(32767) == 0.6397684561_a);
 
-		CHECK(sing(32*32*32 - 1) == 40076.0160362316_a);
+		CHECK(sing(32767) == 40076.0160362316_a);
 		
 	}	 
 }
