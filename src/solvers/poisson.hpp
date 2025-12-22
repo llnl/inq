@@ -244,26 +244,23 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 	
-	{
+	SECTION("Periodic"){
 
 		basis::real_space rs(systems::cell::orthorhombic(10.0_b, 10.0_b, 13.7_b), /*spacing =*/ 0.1, comm);
 
-		SECTION("Grid periodic"){
+		CHECK(rs.cell().periodicity() == 3);
 		
-			CHECK(rs.cell().periodicity() == 3);
-			
-			CHECK(rs.sizes()[0] == 100);
-			CHECK(rs.sizes()[1] == 100);
-			CHECK(rs.sizes()[2] == 140);
-
-		}
+		CHECK(rs.sizes()[0] == 100);
+		CHECK(rs.sizes()[1] == 100);
+		CHECK(rs.sizes()[2] == 140);
 		
 		int const nst = 5;
 		
 		field<real_space, complex> density(rs);
 		field_set<real_space, complex> density_set(rs, nst);
 		
-		SECTION("Point charge"){
+		//Point charge
+		{
 		
 			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
@@ -312,7 +309,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			if(rs.cubic_part(0).start() == 0 and rs.cubic_part(1).start() == 0 and rs.cubic_part(2).start() == 0) CHECK(real(potential.cubic()[0][0][0]) == -0.0238339212_a);
 		}
 
-		SECTION("Plane wave"){
+		//Plane wave
+		{
 
 			double kk = 2.0*M_PI/rs.rlength()[0];
 		
@@ -352,7 +350,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	
 		}
 
-		SECTION("Real plane wave"){
+		//Real plane wave
+		{
 
 			field<real_space, double> rdensity(rs);
 
@@ -392,25 +391,21 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	}
 
 
-	{
+	SECTION("Point charge finite") {
 		basis::real_space rs(systems::cell::cubic(8.0_b).finite(), /*spacing =*/ 0.09, comm);
 
-		SECTION("Grid finite"){		
-
-			CHECK(rs.cell().periodicity() == 0);
-			
-			CHECK(rs.sizes()[0] == 90);
-			CHECK(rs.sizes()[1] == 90);
-			CHECK(rs.sizes()[2] == 90);
-
-		}
+		CHECK(rs.cell().periodicity() == 0);
+		
+		CHECK(rs.sizes()[0] == 90);
+		CHECK(rs.sizes()[1] == 90);
+		CHECK(rs.sizes()[2] == 90);
 
 		int const nst = 3;
 		
 		field<real_space, complex> density(rs);
 		field_set<real_space, complex> density_set(rs, nst);
-	
-		SECTION("Point charge finite"){
+
+		{
 
 			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
