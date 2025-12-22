@@ -576,7 +576,7 @@ cuda-mpich-fast-5proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build      
-      - INQ_EXEC_ENV="mpirun.mpich -np 5 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
+      - cd src; INQ_EXEC_ENV="mpirun.mpich -np 5 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 #########################################################################################################################
 # NVIDIA MPICH DEBUG
@@ -665,7 +665,7 @@ cuda-mpich-debug-4proc:
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build
-      - INQ_EXEC_ENV="mpirun.mpich -np 4 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
+      - cd src; INQ_EXEC_ENV="mpirun.mpich -np 4 $GPUBIND" ctest --output-on-failure --timeout 3600 -j3
 
 #########################################################################################################################
 # NVIDIA MPICH NCCL
