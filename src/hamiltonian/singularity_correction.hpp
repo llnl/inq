@@ -215,21 +215,56 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{0.12500000000000000,-0.20833333333333334, -0.23333333333333334}) == 3.6560191647005245_a);
 		CHECK(hamiltonian::singularity_correction::auxiliary(cell, 2.0*M_PI*vector3<double, covariant>{ 0.14999999999999999, 0.25000000000000000, -3.3333333333333333E-002}) == 5.8717108336249790_a);
 
-		auto bzone = ionic::brillouin(ions, input::kpoints::grid({32, 32, 32}));
-		auto sing = hamiltonian::singularity_correction(cell, bzone);
+		{
+			
+			auto bzone = ionic::brillouin(ions, input::kpoints::grid({32, 32, 32}));
+			auto sing = hamiltonian::singularity_correction(cell, bzone);
+			
+			CHECK(sing.fzero() == 0.6557402601_a);
+			
+			CHECK(sing.fk(    0) == 0.6397684561_a);
+			CHECK(sing.fk(   25) == 0.6397684561_a);
+			CHECK(sing.fk(  369) == 0.6397684561_a);
+			CHECK(sing.fk( 1331) == 0.6397684561_a);
+			CHECK(sing.fk(10789) == 0.6397684561_a);
+			CHECK(sing.fk(20334) == 0.6397684561_a);
+			CHECK(sing.fk(29000) == 0.6397684561_a);
+			CHECK(sing.fk(32767) == 0.6397684561_a);
+			
+			CHECK(sing(32767) == 40076.0160362316_a);
+		}
+		
+		{
+			
+			auto bzone = ionic::brillouin(ions, input::kpoints::grid({2, 2, 2}, true));
+			bzone.insert({0.0, 0.0, 0.0}, 0.5);
+			bzone.insert({0.5, 0.5, 0.5}, 0.0);
+			
+			auto sing = hamiltonian::singularity_correction(cell, bzone);
 
-		CHECK(sing.fzero() == 0.6557402601_a);
-
-		CHECK(sing.fk(    0) == 0.6397684561_a);
-		CHECK(sing.fk(   25) == 0.6397684561_a);
-		CHECK(sing.fk(  369) == 0.6397684561_a);
-		CHECK(sing.fk( 1331) == 0.6397684561_a);
-		CHECK(sing.fk(10789) == 0.6397684561_a);
-		CHECK(sing.fk(20334) == 0.6397684561_a);
-		CHECK(sing.fk(29000) == 0.6397684561_a);
-		CHECK(sing.fk(32767) == 0.6397684561_a);
-
-		CHECK(sing(32767) == 40076.0160362316_a);
+			CHECK(sing.fk(0) == 0.6861351991_a);
+			CHECK(sing.fk(1) == 0.5618541064_a);
+			CHECK(sing.fk(2) == 0.5618541064_a);
+			CHECK(sing.fk(3) == 0.5618541064_a);
+			CHECK(sing.fk(4) == 0.5618541064_a);
+			CHECK(sing.fk(5) == 0.5618541064_a);
+			CHECK(sing.fk(6) == 0.5618541064_a);
+			CHECK(sing.fk(7) == 0.6861351991_a);
+			CHECK(sing.fk(8) == 0.4349838243_a);
+			CHECK(sing.fk(9) == 0.5385514015_a);
+			
+			CHECK(sing(0) == -23.2745831_a);
+			CHECK(sing(1) ==  71.8922676398_a);
+			CHECK(sing(2) ==  71.8922676398_a);
+			CHECK(sing(3) ==  71.8922676398_a);
+			CHECK(sing(4) ==  71.8922676398_a);
+			CHECK(sing(5) ==  71.8922676398_a);
+			CHECK(sing(6) ==  71.8922676398_a);
+			CHECK(sing(7) == -23.2745831_a);
+			CHECK(sing(8) == 169.0417611035_a);
+			CHECK(sing(9) ==  89.7360521536_a);
+		
+		}
 		
 	}	 
 }
