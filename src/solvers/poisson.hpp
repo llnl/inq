@@ -263,34 +263,30 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		{
 
 			double kk = 2.0*M_PI/rs.rlength()[0];
-		
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-						
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);
-						
-						double xx = rs.point_op().rvector_cartesian(ixg, iyg, izg)[0];
-						density.cubic()[ix][iy][iz] = complex(cos(kk*xx), sin(kk*xx));
-						for(int ist = 0; ist < nst; ist++) density_set.hypercubic()[ix][iy][iz][ist] = (1.0 + ist)*density.cubic()[ix][iy][iz];
-					}
-				}
-			}
+
+			gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+							 [kk, dens = begin(density.cubic()), dset = begin(density_set.hypercubic()), point_op = rs.point_op(),
+								part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2)] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+								 
+								 auto ixg = part0.local_to_global(ix);
+								 auto iyg = part1.local_to_global(iy);
+								 auto izg = part2.local_to_global(iz);
+								 
+								 double xx = point_op.rvector_cartesian(ixg, iyg, izg)[0];
+								 dens[ix][iy][iz] = complex(cos(kk*xx), sin(kk*xx));
+								 for(int ist = 0; ist < nst; ist++) dset[ix][iy][iz][ist] = (1.0 + ist)*dens[ix][iy][iz];
+							 });
 
 			auto potential = solvers::poisson::solve(density);
 			solvers::poisson::in_place(density_set);
-			
-			double diff = 0.0;
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-						diff += fabs(potential.cubic()[ix][iy][iz] - 4*M_PI/kk/kk*density.cubic()[ix][iy][iz]);
-						for(int ist = 0; ist < nst; ist++) diff += fabs(density_set.hypercubic()[ix][iy][iz][ist]/(1.0 + ist) - 4*M_PI/kk/kk*density.cubic()[ix][iy][iz]);
-					}
-				}
-			}
+
+			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
+													 [kk, pot = begin(potential.cubic()), dens = begin(density.cubic()), dset = begin(density_set.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+
+														 auto acc = fabs(pot[ix][iy][iz] - 4*M_PI/(kk*kk)*dens[ix][iy][iz]);
+														 for(int ist = 0; ist < nst; ist++) acc += fabs(dset[ix][iy][iz][ist]/(1.0 + ist) - 4*M_PI/(kk*kk)*dens[ix][iy][iz]);
+														 return acc;
+													 });
 
 			comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
 
@@ -303,33 +299,28 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		//Real plane wave
 		{
 
-			field<real_space, double> rdensity(rs);
+			field<real_space, double> density(rs);
 
 			double kk = 8.0*M_PI/rs.rlength()[1];
-		
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-						
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);						
-						double yy = rs.point_op().rvector_cartesian(ixg, iyg, izg)[1];
-						rdensity.cubic()[ix][iy][iz] = cos(kk*yy);
-					}
-				}
-			}
 
-			auto rpotential = solvers::poisson::solve(rdensity);
+			gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+							 [kk, dens = begin(density.cubic()), point_op = rs.point_op(),
+								part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2)] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+								 
+								 auto ixg = part0.local_to_global(ix);
+								 auto iyg = part1.local_to_global(iy);
+								 auto izg = part2.local_to_global(iz);
+								 double yy = point_op.rvector_cartesian(ixg, iyg, izg)[1];
+								 dens[ix][iy][iz] = cos(kk*yy);
+							 });
 
-			double diff = 0.0;
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-						diff += fabs(rpotential.cubic()[ix][iy][iz] - 4*M_PI/kk/kk*rdensity.cubic()[ix][iy][iz]);
-					}
-				}
-			}
+
+			auto potential = solvers::poisson::solve(density);
+			
+			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
+													 [kk, pot = begin(potential.cubic()), dens = begin(density.cubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+														 return fabs(pot[ix][iy][iz] - 4*M_PI/(kk*kk)*dens[ix][iy][iz]);
+													 });
 
 			comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
 
