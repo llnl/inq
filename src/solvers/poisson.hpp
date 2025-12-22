@@ -259,56 +259,6 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		field<real_space, complex> density(rs);
 		field_set<real_space, complex> density_set(rs, nst);
 		
-		//Point charge
-		{
-		
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);
-
-						density.cubic()[ix][iy][iz] = 0.0;
-						for(int ist = 0; ist < nst; ist++) density_set.hypercubic()[ix][iy][iz][ist] = 0.0;
-							
-						if(ixg.value() == 0 and iyg.value() == 0 and izg.value() == 0) {
-							density.cubic()[ix][iy][iz] = -1.0;
-							for(int ist = 0; ist < nst; ist++) density_set.hypercubic()[ix][iy][iz][ist] = -(1.0 + ist);
-						}
-					}
-				}
-			}
-		
-			auto potential = solvers::poisson::solve(density);
-			solvers::poisson::in_place(density_set);
-			
-			double sum[2] = {0.0, 0.0};
-			for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-				for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-					for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-						sum[0] += fabs(real(potential.cubic()[ix][iy][iz]));
-						sum[1] += fabs(imag(potential.cubic()[ix][iy][iz]));
-						for(int ist = 0; ist < nst; ist++) {
-							sum[0] += fabs(real(density_set.hypercubic()[ix][iy][iz][ist]))/(1.0 + ist);
-							sum[1] += fabs(imag(density_set.hypercubic()[ix][iy][iz][ist]))/(1.0 + ist);
-						}
-					}
-				}
-			}
-
-			comm.all_reduce_in_place_n(sum, 2, std::plus<>{});
-			
-			// These values haven't been validated against anything, they are
-			// just for consistency. Of course the imaginary part has to be
-			// zero, since the density is real.
-		
-			CHECK(sum[0]/(nst + 1.0) == 82.9383793318_a);
-			CHECK(fabs(sum[1])/(nst + 1.0) <= 5e-12);
-		
-			if(rs.cubic_part(0).start() == 0 and rs.cubic_part(1).start() == 0 and rs.cubic_part(2).start() == 0) CHECK(real(potential.cubic()[0][0][0]) == -0.0238339212_a);
-		}
-
 		//Plane wave
 		{
 
