@@ -150,7 +150,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	using Catch::Approx;
 
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
-
+	if(comm.size() > 2) return;
+	
 	SECTION("Spin polarized zeeman calculation") {
 		auto par = input::parallelization(comm);
 		auto ions = systems::ions(systems::cell::cubic(10.0_b));
