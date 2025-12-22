@@ -219,24 +219,27 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 				gpu::array<complex, 2> matrix({nx, party.local_size()}, NAN);
 
-				for(int ix = 0; ix < partx.size(); ix++){
-					for(int iy = 0; iy < party.local_size(); iy++){
-						matrix[ix][iy] = complex{double(ix), party.start() + double(iy)};
-					}
-				}
+				gpu::run(party.local_size(), partx.size(),
+								 [ma = begin(matrix), party_start = party.start()] GPU_LAMBDA (auto iy, auto ix) {
+									 ma[ix][iy] = complex{double(ix), party_start + double(iy)};
+								 });
 
 				parallel::transpose(comm, partx, party, matrix);
-
 
 				CHECK(get<0>(sizes(matrix)) == party.size());
 				CHECK(get<1>(sizes(matrix)) == partx.local_size());
 
-				for(int iy = 0; iy < party.size(); iy++){
-					for(int ix = 0; ix < partx.local_size(); ix++){
-						CHECK(real(matrix[iy][ix]) == partx.start() + double(ix));
-						CHECK(imag(matrix[iy][ix]) == double(iy));
-					}
-				}
+				auto fails = gpu::array<int, 1>(2, 0);
+
+				gpu::run(partx.local_size(), party.size(),
+								 [ma = begin(matrix), partx_start = partx.start(), fa = begin(fails)] GPU_LAMBDA (auto ix, auto iy) {
+									 if(real(ma[iy][ix]) != partx_start + double(ix)) gpu::atomic(fa[0])++;
+									 if(imag(ma[iy][ix]) != double(iy))               gpu::atomic(fa[1])++;
+								 });
+
+				CHECK(fails[0] == 0);
+				CHECK(fails[1] == 0);
+				
 			}
 		}
 
@@ -253,16 +256,11 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		auto party = parallel::partition(ny, comm);
 		
 		gpu::array<complex, 4> array({nx, party.local_size(), nz, nw}, NAN);
-		
-		for(int ix = 0; ix < partx.size(); ix++){
-			for(int iy = 0; iy < party.local_size(); iy++){
-				for(int iz = 0; iz < nz; iz++){
-					for(int iw = 0; iw < nw; iw++){
-						array[ix][iy][iz][iw] = complex{ix*1000.0 + iw, party.start() + iy + iz*10000.0};
-					}
-				}
-			}
-		}
+
+		gpu::run(nw, nz, party.local_size(), partx.size(),
+						 [ar = begin(array), party_start = party.start()] GPU_LAMBDA (auto iw, auto iz, auto iy, auto ix) {
+							 ar[ix][iy][iz][iw] = complex{ix*1000.0 + iw, party_start + iy + iz*10000.0};
+						 });
 		
 		parallel::transpose_forward(comm, partx, party, array);
 
@@ -270,17 +268,17 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		CHECK(get<1>(sizes(array)) == party.size());
 		CHECK(get<2>(sizes(array)) == partx.local_size());
 		CHECK(get<3>(sizes(array)) == nw);
+		
+ 		auto fails = gpu::array<int, 1>(2, 0);
+		gpu::run(nw, partx.local_size(), party.size(), nz,
+						 [ar = begin(array), partx_start = partx.start(), fa = begin(fails)] GPU_LAMBDA (auto iw, auto ix, auto iy, auto iz) {
+							 if(real(ar[iz][iy][ix][iw]) != (partx_start + ix)*1000.0 + iw) gpu::atomic(fa[0])++;
+							 if(imag(ar[iz][iy][ix][iw]) != iy + iz*10000.0)                gpu::atomic(fa[1])++;
+						 });
+		
+		CHECK(fails[0] == 0);
+		CHECK(fails[1] == 0);
 
-		for(int iz = 0; iz < nz; iz++){
-			for(int iy = 0; iy < party.size(); iy++){
-				for(int ix = 0; ix < partx.local_size(); ix++){
-					for(int iw = 0; iw < nw; iw++){
-						CHECK(real(array[iz][iy][ix][iw]) == (partx.start() + ix)*1000.0 + iw);
-						CHECK(imag(array[iz][iy][ix][iw]) == iy + iz*10000.0);
-					}
-				}
-			}
-		}
 	}
 
 	SECTION("backward") {
@@ -295,15 +293,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		
 		gpu::array<complex, 4> array({nz, ny, partx.local_size(), nw}, NAN);
 
-		for(int iz = 0; iz < nz; iz++){
-			for(int iy = 0; iy < party.size(); iy++){
-				for(int ix = 0; ix < partx.local_size(); ix++){
-					for(int iw = 0; iw < nw; iw++){
-						array[iz][iy][ix][iw] = complex{(partx.start() + ix)*1000.0 + iw, iy + iz*10000.0};
-					}
-				}
-			}
-		}
+		gpu::run(nw, partx.local_size(), party.size(), nz,
+						 [ar = begin(array), partx_start = partx.start()] GPU_LAMBDA (auto iw, auto ix, auto iy, auto iz) {
+							 ar[iz][iy][ix][iw] = complex{(partx_start + ix)*1000.0 + iw, iy + iz*10000.0};
+						 });
 		
 		parallel::transpose_backward(comm, partx, party, array);
 		
@@ -312,16 +305,16 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		CHECK(get<2>(sizes(array)) == nz);
 		CHECK(get<3>(sizes(array)) == nw);
 
-		for(int ix = 0; ix < partx.size(); ix++){
-			for(int iy = 0; iy < party.local_size(); iy++){
-				for(int iz = 0; iz < nz; iz++){
-					for(int iw = 0; iw < nw; iw++){
-						CHECK(real(array[ix][iy][iz][iw]) == ix*1000.0 + iw);
-						CHECK(imag(array[ix][iy][iz][iw]) == party.start() + iy + iz*10000.0);
-					}
-				}
-			}
-		}
+		auto fails = gpu::array<int, 1>(2, 0);
+		gpu::run(nw, nz, party.local_size(), partx.size(),
+						 [ar = begin(array), party_start = party.start(), fa = begin(fails)] GPU_LAMBDA (auto iw, auto iz, auto iy, auto ix) {
+							 if(real(ar[ix][iy][iz][iw]) != ix*1000.0 + iw)                gpu::atomic(fa[0])++;
+							 if(imag(ar[ix][iy][iz][iw]) != party_start + iy + iz*10000.0) gpu::atomic(fa[1])++;
+						 });
+		
+		CHECK(fails[0] == 0);
+		CHECK(fails[1] == 0);
+
 	}
 	
 	
