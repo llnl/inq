@@ -115,7 +115,7 @@ public:
 							 auto qpoint = kp[ik] - kp[jk];
 							 if(cell.norm(qpoint) < 1e-6) return;
 							 auto aux = auxiliary(dp1, dp2, cell_projection(cell, qpoint));
-							 //  cell_projection is odd, and auxiliary is odd (with respect to the 3rd argument) so we can use aux for both cases
+							 //  cell_projection() is odd, and auxiliary() is odd (with respect to the 3rd argument) so we can use 'aux' for both cases
 							 gpu::atomic::add(&fk[ik], we[jk]*aux);
 							 gpu::atomic::add(&fk[jk], we[ik]*aux);
 						 });
