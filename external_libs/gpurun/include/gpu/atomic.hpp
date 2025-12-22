@@ -16,7 +16,8 @@
 #include <math/vector3.hpp>
 
 namespace gpu {
-namespace atomic {
+
+namespace atomic_op {
 
 template <typename Type1, typename Type2>
 GPU_FUNCTION inline Type1 add(Type1 * val, Type2 const & incr){
@@ -60,6 +61,24 @@ GPU_FUNCTION inline long add(size_t * val, Type2 const & incr){
 #endif
 
 }
+
+template <typename Type>
+class atomic {
+	Type & val_;
+
+public:
+	
+	GPU_FUNCTION explicit atomic(Type & val):
+		val_(val){
+	}
+
+	GPU_FUNCTION void operator+=(Type const & incr) {
+		gpu::atomic_op::add(&val_, incr);
+	}
+	
+};
+
+
 }
 #endif
 

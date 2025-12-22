@@ -230,7 +230,7 @@ long check_run(long size){
 
 	gpu::run(size,
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii){
-						 gpu::atomic::add(&(itlist[ii]), ii + 1);
+						 gpu::atomic(itlist[ii]) += ii + 1;
 					 });
 	
 	long diff = 0;
@@ -246,8 +246,8 @@ long check_run(long size1, long size2){
 	
 	gpu::run(size1, size2, 
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii, auto jj){
-						 gpu::atomic::add(&(itlist[ii][jj][0]), ii + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][1]), jj + 1);
+						 gpu::atomic(itlist[ii][jj][0]) += ii + 1;
+						 gpu::atomic(itlist[ii][jj][1]) += jj + 1;
 					 });
 	
 	long diff = 0;
@@ -267,9 +267,9 @@ long check_run(long size1, long size2, long size3){
 
 	gpu::run(size1, size2, size3,
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii, auto jj, auto kk){
-						 gpu::atomic::add(&(itlist[ii][jj][kk][0]), ii + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][1]), jj + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][2]), kk + 1);
+						 gpu::atomic(itlist[ii][jj][kk][0]) += ii + 1;
+						 gpu::atomic(itlist[ii][jj][kk][1]) += jj + 1;
+						 gpu::atomic(itlist[ii][jj][kk][2]) += kk + 1;
 					 });
 		
 	long diff = 0;
@@ -292,10 +292,10 @@ long check_run(long size1, long size2, long size3, long size4){
 
 	gpu::run(size1, size2, size3, size4,
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii, auto jj, auto kk, auto ll){
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][0]), ii + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][1]), jj + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][2]), kk + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][3]), ll + 1);
+						 gpu::atomic(itlist[ii][jj][kk][ll][0]) += ii + 1;
+						 gpu::atomic(itlist[ii][jj][kk][ll][1]) += jj + 1;
+						 gpu::atomic(itlist[ii][jj][kk][ll][2]) += kk + 1;
+						 gpu::atomic(itlist[ii][jj][kk][ll][3]) += ll + 1;
 					 });
 		
 	long diff = 0;

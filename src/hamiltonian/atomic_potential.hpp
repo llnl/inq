@@ -141,7 +141,7 @@ namespace hamiltonian {
 										spline = ps.short_range_potential().function()] GPU_LAMBDA (auto ipoint){
 										 auto rr = sph.distance(ipoint);
 										 auto potential_val = spline(rr);
-										 gpu::atomic::add(&pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]], potential_val);
+										 gpu::atomic(pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]]) += potential_val;
 									 });
 
 				} else {
@@ -154,8 +154,8 @@ namespace hamiltonian {
 										spline = ps.short_range_potential().function(),
 										dg = double_grid_.ref(),
 										spac = basis.rspacing(), cell = basis.cell()] GPU_LAMBDA (auto ipoint){
-										 gpu::atomic::add(&pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]],
-																			dg.value([spline] GPU_LAMBDA (auto pos) { return spline(pos.length()); }, spac, cell.to_cartesian(sph.point_pos(ipoint))));
+										 gpu::atomic(pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]])
+											 +=	dg.value([spline] GPU_LAMBDA (auto pos) { return spline(pos.length()); }, spac, cell.to_cartesian(sph.point_pos(ipoint)));
 									 });
 				}
 			}
@@ -193,7 +193,7 @@ namespace hamiltonian {
 									chrg = ps.valence_charge(),
 									sp = sep_] GPU_LAMBDA (auto ipoint){
 									 double rr = sph.distance(ipoint);
-									 gpu::atomic::add(&dns[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]], chrg*sp.long_range_density(rr));
+									 gpu::atomic(dns[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]]) += chrg*sp.long_range_density(rr);
 								 });
 			}
 
@@ -235,7 +235,7 @@ namespace hamiltonian {
 										 auto pol = polarization;
 										 if(ispin > 1) return;
 										 if(ispin == 1) pol = 1.0 - pol;
-										 gpu::atomic::add(&dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin], pol*density_val);
+										 gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin]) += pol*density_val;
 									 });
 
 				} else {
@@ -248,7 +248,7 @@ namespace hamiltonian {
 										 auto rr = sph.distance(ipoint);
 										 auto pol = polarization;
 										 if(ispin == 1) pol = 1.0 - pol;
-										 gpu::atomic::add(&dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin], pol*zval/(M_PI)*exp(-2.0*rr));
+										 gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin]) += pol*zval/(M_PI)*exp(-2.0*rr);
 									 });
 					
 				}
@@ -301,7 +301,7 @@ namespace hamiltonian {
 									spline = ps.nlcc_density().function()] GPU_LAMBDA (auto ipoint){
 									 auto rr = sph.distance(ipoint);
 									 auto density_val = spline(rr);
-									 gpu::atomic::add(&dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]], density_val);
+									 gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]]) += density_val;
 								 });
 				
 			}
