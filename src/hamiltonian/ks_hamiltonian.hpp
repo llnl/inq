@@ -321,34 +321,27 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	
 	hamiltonian::ks_hamiltonian<double> ham(rs, bzone, st, pot, ions, 0.0);
 
+	auto const nst = phi.local_set_size();
+	
 	SECTION("Constant function"){
-		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
 
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.0;
-					
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						phi.hypercubic()[ix][iy][iz][ist] = 1.0;
-					}
-				}
-			}
-		}
-		
+		gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+						 [nst, pot = begin(ham.scalar_potential().hypercubic()), ph = begin(phi.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+							 
+							 pot[ix][iy][iz][0] = 0.0;
+							 for(int ist = 0; ist < nst; ist++) ph[ix][iy][iz][ist] = 1.0;
+						 });
+
 		auto hphi = ham(phi);
 		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 0.0);
-					}
-				}
-			}
-		}
-
+		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
+												 [nst, hph = begin(hphi.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 
+													 auto acc = 0.0;
+													 for(int ist = 0; ist < nst; ist++) acc += fabs(hph[ix][iy][iz][ist] - 0.0);
+													 return acc;
+													 });
+		
 		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
 		diff /= hphi.set_size()*hphi.basis().size();
 		
@@ -360,43 +353,39 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		
 		double kk = 2.0*M_PI/rs.rlength()[0];
 		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
+		gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+						 [kk, nst, pot = begin(ham.scalar_potential().hypercubic()), ph = begin(phi.hypercubic()), point_op = rs.point_op(),
+							part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+							 pot[ix][iy][iz][0] = 0.0;
 
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.0;
+							 auto ixg = part0.local_to_global(ix);
+							 auto iyg = part1.local_to_global(iy);
+							 auto izg = part2.local_to_global(iz);	
 					
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);	
-						auto istg = phi.set_part().local_to_global(ist);
-						
-						double xx = rs.point_op().rvector_cartesian(ixg, iyg, izg)[0];
-						phi.hypercubic()[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
-					}
-				}
-			}
-		}
+							 for(int ist = 0; ist < nst; ist++){
+								 
+								 auto istg = set_part.local_to_global(ist);
+								 double xx = point_op.rvector_cartesian(ixg, iyg, izg)[0];
+								 ph[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
+							 }
+						 });
 
 		auto hphi = ham(phi);
 		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						auto istg = phi.set_part().local_to_global(ist);
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
+		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
+												 [kk, nst, ph = begin(phi.hypercubic()), hph = begin(hphi.hypercubic()), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 
+													 auto acc = 0.0;
+													 for(int ist = 0; ist < nst; ist++){
+														 auto istg = set_part.local_to_global(ist);
+														 acc += fabs(hph[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
+													 }
+														 return acc;
+												 });
 		
 		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
 		diff /= hphi.set_size()*hphi.basis().size();
-
+		
 		CHECK(diff < 1e-14);
 		
 	}
@@ -405,43 +394,33 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 		double ww = 2.0;
 
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
+		gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+						 [ww, nst, pot = begin(ham.scalar_potential().hypercubic()), ph = begin(phi.hypercubic()), point_op = rs.point_op(),
+							part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 
-					auto ixg = rs.cubic_part(0).local_to_global(ix);
-					auto iyg = rs.cubic_part(1).local_to_global(iy);
-					auto izg = rs.cubic_part(2).local_to_global(iz);	
-					
-					double r2 = rs.point_op().r2(ixg, iyg, izg);
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.5*ww*ww*r2;
-
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						phi.hypercubic()[ix][iy][iz][ist] = exp(-ww*r2);
-					}
-					
-				}
-			}
-		}
+							 auto ixg = part0.local_to_global(ix);
+							 auto iyg = part1.local_to_global(iy);
+							 auto izg = part2.local_to_global(iz);
+							 
+							 double r2 = point_op.r2(ixg, iyg, izg);
+							 pot[ix][iy][iz][0] = 0.5*ww*ww*r2;
+							 
+							 for(int ist = 0; ist < nst; ist++) ph[ix][iy][iz][ist] = exp(-ww*r2);
+						 });
 
 		auto hphi = ham(phi);
 		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 1.5*ww*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-
+		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
+												 [ww, nst, ph = begin(phi.hypercubic()), hph = begin(hphi.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 auto acc = 0.0;
+													 for(int ist = 0; ist < nst; ist++)	acc += fabs(hph[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
+														 return acc;
+												 });
+		
 		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
 		diff /= hphi.set_size()*hphi.basis().size();
-
-		CHECK(diff == 0.0051420503_a);
 		
+		CHECK(diff == 0.0051420503_a);
 	}
 
 
@@ -553,18 +532,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		};
 
 		for(auto & phi : electrons.kpin()) {
-			for(int ix = 0; ix < phi.basis().cubic_part(0).local_size(); ix++){
-				for(int iy = 0; iy < phi.basis().cubic_part(1).local_size(); iy++){
-					for(int iz = 0; iz < phi.basis().cubic_part(2).local_size(); iz++){
-						for(int ist = 0; ist < phi.set_part().local_size(); ist++){
-							phi.hypercubic()[ix][iy][iz][ist] = 1.0;
-						}
-					}
-				}
-			}
+			phi.fill(1.0);
 
 			auto sphi = overlap_operator(phi);
-			operations::shift(-1.0,sphi,phi);
+			operations::shift(-1.0, sphi, phi);
 			auto olap = operations::overlap(phi);
 			auto olap_array = matrix::all_gather(olap);
 
