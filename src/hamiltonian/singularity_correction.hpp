@@ -109,12 +109,15 @@ public:
 		}
 		
 		for(int ik = 0; ik < bzone.size(); ik++){
-			
-			foka[ik] = 0.0;
-			for(int ik2 = 0; ik2 < bzone.size(); ik2++){
-				auto qpoint = kpoints(ik) - kpoints(ik2);
+			for(int jk = 0; jk < bzone.size(); jk++){
+				if(jk <= ik) continue;
+				
+				auto qpoint = kpoints(ik) - kpoints(jk);
 				if(cell.norm(qpoint) < 1e-6) continue;
-				foka[ik] += weights(ik2)*auxiliary(dp1, dp2, cell_projection(cell, qpoint));
+				auto aux = auxiliary(dp1, dp2, cell_projection(cell, qpoint));
+				//  cell_projection is odd, and auxiliary is odd (with respect to the 3rd argument) so we can use aux for both case
+				foka[ik] += weights(jk)*aux;
+				foka[jk] += weights(ik)*aux;
 			}
 		}
 
