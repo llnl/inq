@@ -116,8 +116,8 @@ public:
 							 if(cell.norm(qpoint) < 1e-6) return;
 							 auto aux = auxiliary(dp1, dp2, cell_projection(cell, qpoint));
 							 //  cell_projection() is odd, and auxiliary() is odd (with respect to the 3rd argument) so we can use 'aux' for both cases
-							 gpu::atomic::add(&fk[ik], we[jk]*aux);
-							 gpu::atomic::add(&fk[jk], we[ik]*aux);
+							 gpu::atomic(fk[ik]) += we[jk]*aux;
+							 gpu::atomic(fk[jk]) += we[ik]*aux;
 						 });
 
 		return foka;
