@@ -332,20 +332,26 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 							 for(int ist = 0; ist < nst; ist++) ph[ix][iy][iz][ist] = 1.0;
 						 });
 
-		auto hphi = ham(phi);
-		
-		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
-												 [nst, hph = begin(hphi.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+		auto hphi_r = ham(phi);
+		auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
+
+		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
+												 [nst, hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 													 
-													 auto acc = 0.0;
-													 for(int ist = 0; ist < nst; ist++) acc += fabs(hph[ix][iy][iz][ist] - 0.0);
-													 return acc;
-													 });
+													 auto acc_r = 0.0;
+													 auto acc_f = 0.0;
+													 for(int ist = 0; ist < nst; ist++) {
+														 acc_r += fabs(hph_r[ix][iy][iz][ist] - 0.0);
+														 acc_f += fabs(hph_f[ix][iy][iz][ist] - 0.0);
+													 }
+													 return complex{acc_r, acc_f};
+												 });
 		
 		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
+		diff /= phi.set_size()*phi.basis().size();
 		
-		CHECK(diff < 1e-14);
+		CHECK(real(diff) < 1e-14);
+		CHECK(imag(diff) < 1e-14);
 		
 	}
 	
@@ -370,23 +376,27 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 							 }
 						 });
 
-		auto hphi = ham(phi);
+		auto hphi_r = ham(phi);
+		auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
 		
-		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
-												 [kk, nst, ph = begin(phi.hypercubic()), hph = begin(hphi.hypercubic()), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
+												 [kk, nst, ph = begin(phi.hypercubic()), hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic()), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 													 
-													 auto acc = 0.0;
+													 auto acc_r = 0.0;
+													 auto acc_f = 0.0;
 													 for(int ist = 0; ist < nst; ist++){
 														 auto istg = set_part.local_to_global(ist);
-														 acc += fabs(hph[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
+														 acc_r += fabs(hph_r[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
+														 acc_f += fabs(hph_f[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
 													 }
-														 return acc;
+													 return complex{acc_r, acc_f};
 												 });
 		
 		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-		
-		CHECK(diff < 1e-14);
+		diff /= phi.set_size()*phi.basis().size();
+
+		CHECK(real(diff) < 1e-14);
+		CHECK(imag(diff) < 1e-14);
 		
 	}
 
@@ -408,110 +418,25 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 							 for(int ist = 0; ist < nst; ist++) ph[ix][iy][iz][ist] = exp(-ww*r2);
 						 });
 
-		auto hphi = ham(phi);
+		auto hphi_r = ham(phi);
+		auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
 		
-		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), 0.0,
-												 [ww, nst, ph = begin(phi.hypercubic()), hph = begin(hphi.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
-													 auto acc = 0.0;
-													 for(int ist = 0; ist < nst; ist++)	acc += fabs(hph[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
-														 return acc;
+		auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
+												 [ww, nst, ph = begin(phi.hypercubic()), hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 auto acc_r = 0.0;
+													 auto acc_f = 0.0;
+													 for(int ist = 0; ist < nst; ist++)	{
+														 acc_r += fabs(hph_r[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
+														 acc_f += fabs(hph_f[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
+													 }
+													 return complex{acc_r, acc_f};
 												 });
 		
 		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
+		diff /= phi.set_size()*phi.basis().size();
 		
-		CHECK(diff == 0.0051420503_a);
-	}
-
-
-	SECTION("Plane wave - fourier"){
-		
-		double kk = 2.0*M_PI/rs.rlength()[0];
-		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.0;
-					
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);	
-						auto istg = phi.set_part().local_to_global(ist);
-						
-						double xx = rs.point_op().rvector_cartesian(ixg, iyg, izg)[0];
-						phi.hypercubic()[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
-					}
-				}
-			}
-		}
-
-		auto hphi = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-
-						auto istg = phi.set_part().local_to_global(ist);
-
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-
-		CHECK(diff < 1e-14);
-		
-	}
-
-	SECTION("Harmonic oscillator - fourier"){
-
-		double ww = 2.0;
-
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-
-					auto ixg = rs.cubic_part(0).local_to_global(ix);
-					auto iyg = rs.cubic_part(1).local_to_global(iy);
-					auto izg = rs.cubic_part(2).local_to_global(iz);	
-					
-					double r2 = rs.point_op().r2(ixg, iyg, izg);
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.5*ww*ww*r2;
-
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						phi.hypercubic()[ix][iy][iz][ist] = exp(-ww*r2);
-					}
-					
-				}
-			}
-		}
-
-		auto hphi = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 1.5*ww*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-
-		CHECK(diff == 0.0051420503_a);
-		
+		CHECK(real(diff) == 0.0051420503_a);
+		CHECK(imag(diff) == 0.0051420503_a);
 	}
 
 	SECTION("PAW Overlap operator"){
