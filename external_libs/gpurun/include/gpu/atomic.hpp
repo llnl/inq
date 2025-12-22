@@ -75,6 +75,14 @@ public:
 	GPU_FUNCTION void operator+=(Type const & incr) {
 		gpu::atomic_op::add(&val_, incr);
 	}
+
+	GPU_FUNCTION void operator++(int) {
+		gpu::atomic_op::add(&val_, 1);
+	}
+
+	GPU_FUNCTION void operator++() {
+		gpu::atomic_op::add(&val_, 1);
+	}
 	
 };
 
