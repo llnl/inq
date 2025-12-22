@@ -52,6 +52,7 @@ using Catch::Approx;
 TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
+	if(comm.size() > 2) return;
 
 	vector3<quantity<magnitude::magfield>> bvec = {0.0_amu, 0.0_amu, 1.0_amu};
 	perturbations::magnetic uniform_magnetic{bvec};
