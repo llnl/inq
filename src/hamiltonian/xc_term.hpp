@@ -139,19 +139,23 @@ public:
 		double efunc = 0.0;
 		
 		basis::field_set<basis::real_space, double> vfunc(full_density.skeleton());
-		
+
 		auto density_gradient = std::optional<decltype(operations::gradient(full_density))>{};
 		if(any_requires_gradient()) density_gradient.emplace(operations::gradient(full_density));
 
 		auto density_laplacian = std::optional<decltype(operations::laplacian(full_density))>{};
 		if(any_requires_laplacian()) density_laplacian.emplace(operations::laplacian(full_density));
 
-		if(any_requires_kinetic_energy_density()) assert(kinetic_energy_density.has_value());
+		auto vtau = std::optional<basis::field_set<basis::real_space, double>>{};
+		if(any_requires_kinetic_energy_density()) {
+			assert(kinetic_energy_density.has_value());
+			vtau.emplace(kinetic_energy_density->skeleton());
+		}
 		
 		for(auto & func : functionals_){
 			if(not func.true_functional()) continue;
 
-			evaluate_functional(func, full_density, density_gradient, density_laplacian, kinetic_energy_density, efunc, vfunc);
+			evaluate_functional(func, full_density, density_gradient, density_laplacian, kinetic_energy_density, efunc, vfunc, vtau);
 			compute_vxc(spin_density, vfunc, vxc);
 
 			exc += efunc;
@@ -201,7 +205,7 @@ public:
 	template <typename Density, typename DensityGradient, typename DensityLaplacian, typename KineticEnergyDensity>
 	static void evaluate_functional(hamiltonian::xc_functional const & functional,
 																	Density const & density, DensityGradient const & density_gradient, DensityLaplacian const & density_laplacian, KineticEnergyDensity const & kinetic_energy_density,
-																	double & efunctional, basis::field_set<basis::real_space, double> & vfunctional){
+																	double & efunctional, basis::field_set<basis::real_space, double> & vfunctional, std::optional<basis::field_set<basis::real_space, double>> & vtau){
 		CALI_CXX_MARK_FUNCTION;
 
 		auto edens = basis::field<basis::real_space, double>(density.basis());
@@ -250,15 +254,16 @@ public:
 		} else if(functional.family() == XC_FAMILY_MGGA){
 			
 			//FOR THE MOMENT THIS DUPLICATES A LOT OF CODE FROM GGA, THEY SHOULD BE CONSOLIDATED
-			
+
+			assert(kinetic_energy_density.has_value());
+			assert(vtau.has_value());
 			assert(kinetic_energy_density->set_size() != 4); //non-collinear is not implemented yet
 			
 			auto nsigma = (density.set_size() > 1) ? 3:1;
 			
 			basis::field_set<basis::real_space, double> sigma(density.basis(), nsigma);
 			basis::field_set<basis::real_space, double> vsigma(sigma.skeleton());
-			basis::field_set<basis::real_space, double> vlapl(sigma.skeleton());
-			basis::field_set<basis::real_space, double> vtau(sigma.skeleton());
+			basis::field_set<basis::real_space, double> vlapl(density_laplacian->skeleton());
 			
 			gpu::run(density.basis().local_size(),
 							 [gr = begin(density_gradient->matrix()), si = begin(sigma.matrix()), cell = density.basis().cell(), nsigma] GPU_LAMBDA (auto ip){
@@ -272,7 +277,7 @@ public:
 											raw_pointer_cast(density_laplacian->matrix().data_elements()), raw_pointer_cast(kinetic_energy_density->matrix().data_elements()),
 											edens.data(),
 											raw_pointer_cast(vfunctional.matrix().data_elements()), raw_pointer_cast(vsigma.matrix().data_elements()),	
-											raw_pointer_cast(vlapl.matrix().data_elements()), raw_pointer_cast(vtau.matrix().data_elements()));
+											raw_pointer_cast(vlapl.matrix().data_elements()), raw_pointer_cast(vtau->matrix().data_elements()));
 			gpu::sync();
 
 			basis::field_set<basis::real_space, vector3<double, covariant>> term(vfunctional.skeleton());
@@ -286,8 +291,11 @@ public:
 
 			auto div_term = operations::divergence(term);
 			auto lapl_vlapl = operations::laplacian(vlapl);
+
+			assert(vfunctional.local_set_size() == div_term.local_set_size());
+			assert(vfunctional.local_set_size() == lapl_vlapl.local_set_size());
 			
-			gpu::run(density.local_set_size(), density.basis().local_size(),
+			gpu::run(vfunctional.local_set_size(), vfunctional.basis().local_size(),
 							 [di = begin(div_term.matrix()), vf = begin(vfunctional.matrix()), la = begin(lapl_vlapl.matrix())] GPU_LAMBDA (auto ispin, auto ip){
 								 vf[ip][ispin] += di[ip][ispin] + la[ip][ispin];
 							 });
@@ -422,7 +430,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 		basis::field_set<basis::real_space, double> vfunc_unp(bas, 1);  
 		basis::field_set<basis::real_space, double> vfunc_pol(bas, 2);
-	
+
+		auto vtau_unp = std::optional{basis::field_set<basis::real_space, double>(bas, 1)};
+		auto vtau_pol = std::optional{basis::field_set<basis::real_space, double>(bas, 2)};
+		
 		//LDA_X
 		{
 
@@ -432,8 +443,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp, vtau_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol, vtau_pol);
 
 			CHECK(efunc_unp == -14.0558385758_a);
 			CHECK(efunc_pol == -15.1680272137_a);
@@ -463,8 +474,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp, vtau_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol, vtau_pol);
 
 			CHECK(efunc_unp == -1.8220292936_a);
 			CHECK(efunc_pol == -1.5670264162_a);
@@ -494,8 +505,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp, vtau_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol, vtau_pol);
 
 			CHECK(efunc_unp == -13.2435562623_a);
 			CHECK(efunc_pol == -13.838126858_a);
@@ -524,8 +535,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp, vtau_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol, vtau_pol);
 			
 			CHECK(efunc_unp == -15.5229465822_a);
 			CHECK(efunc_pol == -16.5543212526_a);
@@ -533,15 +544,25 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			if(contains1) {
 				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.1414100307_a);
 			
-				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.8497312767_a);
-				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.4435505599_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.1509734221_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.1660845089_a);
+
+				CHECK(vtau_unp->hypercubic()[p1[0]][p1[1]][p1[2]][0] == 0.0_a);
+								
+				CHECK(vtau_pol->hypercubic()[p1[0]][p1[1]][p1[2]][0] == 0.0_a);
+				CHECK(vtau_pol->hypercubic()[p1[0]][p1[1]][p1[2]][1] == 0.0_a);
 			}
 
 			if(contains2) {
 				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -1.640235861_a);
 			
-				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -2.2430806104_a);
-				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -2.9259184683_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -1.4554176279_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -2.4222974495_a);
+
+				CHECK(vtau_unp->hypercubic()[p2[0]][p2[1]][p2[2]][0] == 0.0_a);
+								
+				CHECK(vtau_pol->hypercubic()[p2[0]][p2[1]][p2[2]][0] == 0.0_a);
+				CHECK(vtau_pol->hypercubic()[p2[0]][p2[1]][p2[2]][1] == 0.0_a);
 			}
 		}
 		
@@ -554,8 +575,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp, vtau_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol, vtau_pol);
 			
 			CHECK(efunc_unp == -2.5963608955_a);
 			CHECK(efunc_pol == -2.3104805142_a);
@@ -565,6 +586,11 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			
 				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -3.8096728541_a);
 				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -3.8559179377_a);
+				
+				CHECK(vtau_unp->hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0008155329_a);
+								
+				CHECK(vtau_pol->hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0012537846_a);
+				CHECK(vtau_pol->hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.0012537846_a);
 			}
 
 			if(contains2) {
@@ -572,6 +598,11 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			
 				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -32.1491393735_a);
 				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -32.2420958089_a);
+
+				CHECK(vtau_unp->hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  -0.0001140363_a);
+								
+				CHECK(vtau_pol->hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  -0.0002096395_a);
+				CHECK(vtau_pol->hypercubic()[p2[0]][p2[1]][p2[2]][1] ==  -0.0002096395_a);
 			}
 		}
 		
