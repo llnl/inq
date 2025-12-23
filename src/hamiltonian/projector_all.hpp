@@ -288,7 +288,7 @@ public:
 						 [sgr = begin(sphere_vnlphi), gr = begin(vnlphi.hypercubic()), poi = begin(points_), pos = begin(positions_), kpoint, empty = begin(locally_empty_)] GPU_LAMBDA (auto ist, auto ipoint, auto iproj){
 							 if(not empty[iproj] and poi[iproj][ipoint][0] >= 0){
 								 auto phase = polar(1.0, -dot(kpoint, pos[iproj][ipoint]));
-								 gpu::atomic::add(&gr[poi[iproj][ipoint][0]][poi[iproj][ipoint][1]][poi[iproj][ipoint][2]][ist], phase*sgr[iproj][ipoint][ist]);
+								 gpu::atomic(gr[poi[iproj][ipoint][0]][poi[iproj][ipoint][1]][poi[iproj][ipoint][2]][ist]) += phase*sgr[iproj][ipoint][ist];
 							 }
 						 });
 	}
@@ -448,7 +448,7 @@ public:
 									 auto rr = static_cast<vector3<double, contravariant>>(pos[iproj][ipoint]);
 									 auto phase = polar(1.0, -dot(kpoint, rr));
 									 auto commutator = phase*cell.to_covariant(srphi[iproj][ipoint][ist] - rr*sgr[iproj][ipoint][ist]);
-									 gpu::atomic::add(&gr[poi[iproj][ipoint][0]][poi[iproj][ipoint][1]][poi[iproj][ipoint][2]][ist], commutator);
+									 gpu::atomic(gr[poi[iproj][ipoint][0]][poi[iproj][ipoint][1]][poi[iproj][ipoint][2]][ist]) += commutator;
 								 }
 							 });
 		}

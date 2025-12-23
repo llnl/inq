@@ -195,9 +195,9 @@ public:
 								 red1 += bet[iproj][ip][1]*pp;
 							 }
 
-							 gpu::atomic::add(&gr[point[0]][point[1]][point[2]][0][ist], phase*red0);
-							 gpu::atomic::add(&gr[point[0]][point[1]][point[2]][1][ist], phase*red1);
-							 
+							 gpu::atomic(gr[point[0]][point[1]][point[2]][0][ist]) += phase*red0;
+							 gpu::atomic(gr[point[0]][point[1]][point[2]][1][ist]) += phase*red1;
+						 
 						 });
 	}
 
