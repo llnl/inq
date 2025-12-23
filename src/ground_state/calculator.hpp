@@ -26,6 +26,7 @@
 #include <operations/integral.hpp>
 #include <observables/density.hpp>
 #include <observables/forces_stress.hpp>
+#include <observables/kinetic_energy_density.hpp>
 #include <parallel/gather.hpp>
 #include <mixers/linear.hpp>
 #include <mixers/broyden.hpp>
@@ -123,9 +124,9 @@ public:
 		}();
 		
 		auto old_energy = std::numeric_limits<double>::max();
-		
+
 		sc_.update_ionic_fields(electrons.states_comm(), ions_, electrons.atomic_pot());
-		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density());
+		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density(), std::optional{observables::kinetic_energy_density(electrons)});
 		
 		res.energy.ion(ionic::interaction_energy(ions_.cell(), ions_, electrons.atomic_pot()));
 		
@@ -190,7 +191,7 @@ public:
 				}
 			}
 			
-			sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density());
+			sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density(), std::optional{observables::kinetic_energy_density(electrons)});
 			
 			CALI_MARK_END("mixing");
 			
@@ -234,7 +235,7 @@ public:
 		
 		//make sure we have a density consistent with phi
 		electrons.spin_density() = observables::density::calculate(electrons);
-		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density());
+		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density(), std::optional{observables::kinetic_energy_density(electrons)});
 		auto normres = res.energy.calculate(ham_, electrons);
 			
 		if(solver_.calc_forces()) {
