@@ -465,16 +465,28 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	SECTION("xc_term object") {
 
 		auto hf = hamiltonian::xc_term(options::theory{}.hartree_fock(), 1);
-		CHECK(hf.any_requires_gradient() == false);
-		CHECK(hf.any_true_functional() == false);
+		CHECK(hf.any_requires_gradient()                == false);
+		CHECK(hf.any_requires_laplacian()               == false);
+		CHECK(hf.any_requires_kinetic_energy_density()  == false);
+		CHECK(hf.any_true_functional()                  == false);
 		
 		auto lda = hamiltonian::xc_term(options::theory{}.lda(), 1);
-		CHECK(lda.any_requires_gradient() == false);
-		CHECK(lda.any_true_functional() == true);
+		CHECK(lda.any_requires_gradient()               == false);
+		CHECK(lda.any_requires_laplacian()              == false);
+		CHECK(lda.any_requires_kinetic_energy_density() == false);
+		CHECK(lda.any_true_functional()                 == true);
 
 		auto pbe = hamiltonian::xc_term(options::theory{}.pbe(), 1);
-		CHECK(pbe.any_requires_gradient() == true);
-		CHECK(pbe.any_true_functional() == true);
+		CHECK(pbe.any_requires_gradient()               == true);
+		CHECK(pbe.any_requires_laplacian()              == false);
+		CHECK(pbe.any_requires_kinetic_energy_density() == false);
+		CHECK(pbe.any_true_functional()                 == true);
+
+		auto scan = hamiltonian::xc_term(options::theory{}.scan(), 1);
+		CHECK(scan.any_requires_gradient()               == true);
+		CHECK(scan.any_requires_laplacian()              == true);
+		CHECK(scan.any_requires_kinetic_energy_density() == true);
+		CHECK(scan.any_true_functional()                 == true);
 
 	}
 	
