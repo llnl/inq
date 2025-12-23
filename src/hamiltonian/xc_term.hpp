@@ -206,7 +206,7 @@ public:
 		auto edens = basis::field<basis::real_space, double>(density.basis());
 
 		assert(functional.nspin() == density.set_size());
-		
+
 		if(functional.family() == XC_FAMILY_LDA){
 			xc_lda_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(), raw_pointer_cast(density.matrix().data_elements()),
 										 edens.data(), raw_pointer_cast(vfunctional.matrix().data_elements()));
@@ -246,8 +246,10 @@ public:
 								 vf[ip][ispin] += di[ip][ispin];
 							 });
 
+		} else if(functional.family() == XC_FAMILY_MGGA){
+			throw std::runtime_error("inq error: unsupported MGGA exchange correlation functional");
 		} else {
-			std::runtime_error("inq error: unsupported exchange correlation functional type");
+			throw std::runtime_error("inq error: unsupported exchange correlation functional type");
 		}
 		
 		efunctional = operations::integral_product(edens, observables::density::total(density));
