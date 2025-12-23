@@ -246,7 +246,9 @@ public:
 
 			auto div_term = operations::divergence(term);
 
-			gpu::run(density.local_set_size(), density.basis().local_size(),
+			assert(vfunctional.local_set_size() == div_term.local_set_size());
+
+			gpu::run(vfunctional.local_set_size(), vfunctional.basis().local_size(),
 							 [di = begin(div_term.matrix()), vf = begin(vfunctional.matrix())] GPU_LAMBDA (auto ispin, auto ip){
 								 vf[ip][ispin] += di[ip][ispin];
 							 });
