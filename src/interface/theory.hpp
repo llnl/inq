@@ -171,6 +171,11 @@ These are the options available:
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
+	void scan() const{
+		auto theo = options::theory::load(".inq/default_theory").scan();
+		theo.save(input::environment::global().comm(), ".inq/default_theory");
+	}
+	
 	void functional(int exchange, int correlation = XC_NONE) const{
 		auto theo = options::theory::load(".inq/default_theory").functional(exchange, correlation);
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
@@ -199,6 +204,8 @@ These are the options available:
 			pbe0();
 		} else if(args.size() == 1 and args[0] == "b3lyp") {
 			b3lyp();
+		} else if(args.size() == 1 and args[0] == "scan") {
+			scan();
 
 		} else if(args[0] == "functional") {
 
