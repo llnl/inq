@@ -139,8 +139,8 @@ public:
 			assert(kinetic_energy_density.has_value());
 			if(not hamiltonian.vmgga_.has_value()) hamiltonian.vmgga_.emplace(kinetic_energy_density->skeleton());
 		}
-		
-		hamiltonian.vxc_ = xc_(spin_density, core_density_, kinetic_energy_density, hamiltonian.vmgga_, exc, nvxc);
+
+		xc_(spin_density, core_density_, kinetic_energy_density, hamiltonian.vxc_, hamiltonian.vmgga_, exc, nvxc);
 		
 		assert(hamiltonian.vxc_.set_size() == vks.set_size());
 		

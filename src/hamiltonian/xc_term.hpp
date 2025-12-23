@@ -126,14 +126,13 @@ public:
   ////////////////////////////////////////////////////////////////////////////////////////////
 	
   template <typename SpinDensity, typename CoreDensity, typename KineticEnergyDensity>
-  auto operator()(SpinDensity const & spin_density, CoreDensity const & core_density, KineticEnergyDensity const & kinetic_energy_density,
-									std::optional<basis::field_set<basis::real_space, double>> & vtau, double & exc, double & nvxc) const {
+  void operator()(SpinDensity const & spin_density, CoreDensity const & core_density, KineticEnergyDensity const & kinetic_energy_density,
+									basis::field_set<basis::real_space, double> & vxc, std::optional<basis::field_set<basis::real_space, double>> & vtau, double & exc, double & nvxc) const {
 
-		basis::field_set<basis::real_space, double> vxc(spin_density.skeleton());
 		vxc.fill(0.0);
 		exc = 0.0;
 		nvxc = 0.0;
-		if(not any_true_functional()) return vxc;
+		if(not any_true_functional()) return;
 		
 		auto full_density = process_density(spin_density, core_density);
 		
@@ -162,8 +161,6 @@ public:
 		}
 
 		nvxc += compute_nvxc(spin_density, vxc);
-
-		return vxc;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////
