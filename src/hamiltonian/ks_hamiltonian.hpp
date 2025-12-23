@@ -19,6 +19,7 @@
 #include <hamiltonian/scalar_potential.hpp>
 #include <input/environment.hpp>
 #include <operations/transform.hpp>
+#include <operations/divergence.hpp>
 #include <operations/laplacian.hpp>
 #include <operations/gradient.hpp>
 #include <states/ks_states.hpp>
@@ -132,6 +133,26 @@ public:
 		return en;
 		
 	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+
+	void mgga_term(states::orbital_set<basis::real_space, complex> const & phi, states::orbital_set<basis::real_space, complex> & hphi) const {
+		//THIS PROBABLY CAN BE DONE MORE EFFICIENTLY BY REUSING THE FFTS IN THE HAMILTONIAN
+		CALI_CXX_MARK_FUNCTION;
+		
+		if(vmgga_.has_value()) {
+			auto gphi = operations::gradient(phi);
+			gpu::run(gphi.local_set_size(), gphi.basis().local_size(),
+							 [ispin = phi.spin_index(), _gphi = begin(gphi.matrix()), _vmgga = begin(vmgga_->matrix())] GPU_LAMBDA (auto ist, auto ip) {
+								 _gphi[ip][ist] *= _vmgga[ip][ispin];
+							 });
+			auto div = operations::divergence(gphi);
+			gpu::run(hphi.local_set_size(), hphi.basis().local_size(),
+							 [_hphi = begin(hphi.matrix()), _div = begin(div.matrix())] GPU_LAMBDA (auto ist, auto ip) {
+								 _hphi[ip][ist] -= _div[ip][ist];
+							 });
+		}
+	}
 	
 	////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,7 +161,7 @@ public:
 		CALI_CXX_MARK_SCOPE("hamiltonian_real");
 
 		auto proj = projectors_all_.project(phi, phi.kpoint() + uniform_vector_potential_);
-			
+
 		auto phi_fs = operations::transform::to_fourier(phi);
 		
 		auto hphi_fs = operations::laplacian(phi_fs, -0.5, -2.0*phi.basis().cell().to_contravariant(phi.kpoint() + uniform_vector_potential_));
@@ -149,7 +170,8 @@ public:
 
 		hamiltonian::scalar_potential_add(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().norm(phi.kpoint() + uniform_vector_potential_), phi, hphi);
 		exchange_(phi, hphi);
-
+		mgga_term(phi, hphi);
+		
 		for(auto & pr : projectors_rel_) pr.apply(phi, hphi, phi.kpoint() + uniform_vector_potential_);
 		projectors_all_.apply(proj, hphi, phi.kpoint() + uniform_vector_potential_);
 
@@ -167,8 +189,8 @@ public:
 		auto proj = projectors_all_.project(phi_rs, phi.kpoint() + uniform_vector_potential_);
 			
 		auto hphi_rs = hamiltonian::scalar_potential(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().norm(phi.kpoint() + uniform_vector_potential_), phi_rs);
-		
 		exchange_(phi_rs, hphi_rs);
+		mgga_term(phi_rs, hphi_rs);
 
 		for(auto & pr : projectors_rel_) pr.apply(phi_rs, hphi_rs, phi.kpoint() + uniform_vector_potential_);
 		projectors_all_.apply(proj, hphi_rs, phi.kpoint() + uniform_vector_potential_);
