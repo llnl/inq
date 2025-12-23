@@ -84,6 +84,16 @@ namespace hamiltonian {
 			if(not true_functional()) return false;
 			return family() != XC_FAMILY_LDA;
 		}
+
+		auto requires_laplacian() const {
+			if(not true_functional()) return false;
+			return family() == XC_FAMILY_MGGA;
+		}
+
+		auto requires_kinetic_energy_density() const {
+			if(not true_functional()) return false;
+			return family() == XC_FAMILY_MGGA;
+		}
 		
 		auto exx_coefficient() const {
 			if(xc_hyb_type(libxc_func_ptr()) == XC_HYB_HYBRID) return xc_hyb_exx_coef(libxc_func_ptr());

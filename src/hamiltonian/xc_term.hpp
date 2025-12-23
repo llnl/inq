@@ -46,6 +46,20 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////
 
+	auto any_requires_laplacian() const {
+		for(auto & func : functionals_) if(func.requires_laplacian()) return true;
+		return false;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+
+	auto any_requires_kinetic_energy_density() const {
+		for(auto & func : functionals_) if(func.requires_kinetic_energy_density()) return true;
+		return false;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+	
 	auto any_true_functional() const {
 		for(auto & func : functionals_) if(func.true_functional()) return true;
 		return false;
@@ -125,13 +139,17 @@ public:
 		double efunc = 0.0;
 		
 		basis::field_set<basis::real_space, double> vfunc(full_density.skeleton());
+		
 		auto density_gradient = std::optional<decltype(operations::gradient(full_density))>{};
 		if(any_requires_gradient()) density_gradient.emplace(operations::gradient(full_density));
 
+		auto density_laplacian = std::optional<decltype(operations::laplacian(full_density))>{};
+		if(any_requires_laplacian()) density_laplacian.emplace(operations::laplacian(full_density));
+		
 		for(auto & func : functionals_){
 			if(not func.true_functional()) continue;
 
-			evaluate_functional(func, full_density, density_gradient, efunc, vfunc);
+			evaluate_functional(func, full_density, density_gradient, density_laplacian, efunc, vfunc);
 			compute_vxc(spin_density, vfunc, vxc);
 
 			exc += efunc;
@@ -178,8 +196,8 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////
 
-	template <typename DensityType, typename DensityGradientType>
-	static void evaluate_functional(hamiltonian::xc_functional const & functional, DensityType const & density, DensityGradientType const & density_gradient,
+	template <typename Density, typename DensityGradient, typename DensityLaplacian>
+	static void evaluate_functional(hamiltonian::xc_functional const & functional, Density const & density, DensityGradient const & density_gradient, DensityLaplacian const & density_laplacian,
 																	double & efunctional, basis::field_set<basis::real_space, double> & vfunctional){
 		CALI_CXX_MARK_FUNCTION;
 
