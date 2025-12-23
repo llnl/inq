@@ -135,7 +135,12 @@ public:
 		
 		// XC
 		double exc, nvxc;
-		hamiltonian.vxc_ = xc_(spin_density, core_density_, kinetic_energy_density, exc, nvxc);
+		if(xc_.any_requires_kinetic_energy_density()) {
+			assert(kinetic_energy_density.has_value());
+			if(not hamiltonian.vmgga_.has_value()) hamiltonian.vmgga_.emplace(kinetic_energy_density->skeleton());
+		}
+		
+		hamiltonian.vxc_ = xc_(spin_density, core_density_, kinetic_energy_density, hamiltonian.vmgga_, exc, nvxc);
 		
 		assert(hamiltonian.vxc_.set_size() == vks.set_size());
 		

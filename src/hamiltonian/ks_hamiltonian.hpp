@@ -44,6 +44,7 @@ private:
 	exchange_operator exchange_;
 	basis::field_set<basis::real_space, double> vxc_;
 	basis::field_set<basis::real_space, PotentialType> scalar_potential_;
+	std::optional<basis::field_set<basis::real_space, double>> vmgga_;
 	vector3<double, covariant> uniform_vector_potential_;
 	projector_all projectors_all_;		
 	std::list<relativistic_projector> projectors_rel_;

@@ -126,7 +126,8 @@ public:
   ////////////////////////////////////////////////////////////////////////////////////////////
 	
   template <typename SpinDensity, typename CoreDensity, typename KineticEnergyDensity>
-  auto operator()(SpinDensity const & spin_density, CoreDensity const & core_density, KineticEnergyDensity const & kinetic_energy_density, double & exc, double & nvxc) const {
+  auto operator()(SpinDensity const & spin_density, CoreDensity const & core_density, KineticEnergyDensity const & kinetic_energy_density,
+									std::optional<basis::field_set<basis::real_space, double>> & vtau, double & exc, double & nvxc) const {
 
 		basis::field_set<basis::real_space, double> vxc(spin_density.skeleton());
 		vxc.fill(0.0);
@@ -146,10 +147,9 @@ public:
 		auto density_laplacian = std::optional<decltype(operations::laplacian(full_density))>{};
 		if(any_requires_laplacian()) density_laplacian.emplace(operations::laplacian(full_density));
 
-		auto vtau = std::optional<basis::field_set<basis::real_space, double>>{};
 		if(any_requires_kinetic_energy_density()) {
 			assert(kinetic_energy_density.has_value());
-			vtau.emplace(kinetic_energy_density->skeleton());
+			assert(vtau.has_value());
 		}
 		
 		for(auto & func : functionals_){
