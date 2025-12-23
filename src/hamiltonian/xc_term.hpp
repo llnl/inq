@@ -248,7 +248,51 @@ public:
 							 });
 
 		} else if(functional.family() == XC_FAMILY_MGGA){
-			throw std::runtime_error("inq error: unsupported MGGA exchange correlation functional");
+			
+			//FOR THE MOMENT THIS DUPLICATES A LOT OF CODE FROM GGA, THEY SHOULD BE CONSOLIDATED
+			
+			assert(kinetic_energy_density->set_size() != 4); //non-collinear is not implemented yet
+			
+			auto nsigma = (density.set_size() > 1) ? 3:1;
+			
+			basis::field_set<basis::real_space, double> sigma(density.basis(), nsigma);
+			basis::field_set<basis::real_space, double> vsigma(sigma.skeleton());
+			basis::field_set<basis::real_space, double> vlapl(sigma.skeleton());
+			basis::field_set<basis::real_space, double> vtau(sigma.skeleton());
+			
+			gpu::run(density.basis().local_size(),
+							 [gr = begin(density_gradient->matrix()), si = begin(sigma.matrix()), cell = density.basis().cell(), nsigma] GPU_LAMBDA (auto ip){
+								 si[ip][0] = cell.norm(gr[ip][0]);
+								 if(nsigma > 1) si[ip][1] = cell.dot(gr[ip][0], gr[ip][1]);
+								 if(nsigma > 1) si[ip][2] = cell.norm(gr[ip][1]);
+							 });
+
+			xc_mgga_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(),
+											raw_pointer_cast(density.matrix().data_elements()), raw_pointer_cast(sigma.matrix().data_elements()),
+											raw_pointer_cast(density_laplacian->matrix().data_elements()), raw_pointer_cast(kinetic_energy_density->matrix().data_elements()),
+											edens.data(),
+											raw_pointer_cast(vfunctional.matrix().data_elements()), raw_pointer_cast(vsigma.matrix().data_elements()),	
+											raw_pointer_cast(vlapl.matrix().data_elements()), raw_pointer_cast(vtau.matrix().data_elements()));
+			gpu::sync();
+
+			basis::field_set<basis::real_space, vector3<double, covariant>> term(vfunctional.skeleton());
+
+			gpu::run(density.basis().local_size(),
+							 [vs = begin(vsigma.matrix()), gr = begin(density_gradient->matrix()), te = begin(term.matrix()), nsigma] GPU_LAMBDA (auto ip){
+								 if(nsigma == 1) te[ip][0] = -2.0*vs[ip][0]*gr[ip][0];
+								 if(nsigma == 3) te[ip][0] = -2.0*vs[ip][0]*gr[ip][0] - vs[ip][1]*gr[ip][1];
+								 if(nsigma == 3) te[ip][1] = -2.0*vs[ip][2]*gr[ip][1] - vs[ip][1]*gr[ip][0];
+							 });
+
+			auto div_term = operations::divergence(term);
+			auto lapl_vlapl = operations::laplacian(vlapl);
+			
+			gpu::run(density.local_set_size(), density.basis().local_size(),
+							 [di = begin(div_term.matrix()), vf = begin(vfunctional.matrix()), la = begin(lapl_vlapl.matrix())] GPU_LAMBDA (auto ispin, auto ip){
+								 vf[ip][ispin] += di[ip][ispin] + la[ip][ispin];
+							 });
+
+			
 		} else {
 			throw std::runtime_error("inq error: unsupported exchange correlation functional type");
 		}
@@ -468,6 +512,66 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			
 				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5046576968_a);
 				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.352403833_a);
+			}
+		}
+
+		//SCANL X
+		{
+		
+			hamiltonian::xc_functional func_unp(XC_MGGA_X_SCANL, 1);
+			hamiltonian::xc_functional func_pol(XC_MGGA_X_SCANL, 2);
+		
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
+		
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
+			
+			CHECK(efunc_unp == -15.5229465822_a);
+			CHECK(efunc_pol == -16.5543212526_a);
+		
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.1414100307_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.8497312767_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.4435505599_a);
+			}
+
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -1.640235861_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -2.2430806104_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -2.9259184683_a);
+			}
+		}
+		
+		//SCAN C
+		{
+		
+			hamiltonian::xc_functional func_unp(XC_MGGA_C_SCAN, 1);
+			hamiltonian::xc_functional func_pol(XC_MGGA_C_SCAN, 2);
+		
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
+		
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
+			
+			CHECK(efunc_unp == -2.5963608955_a);
+			CHECK(efunc_pol == -2.3104805142_a);
+		
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -2.3921718467_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -3.8096728541_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -3.8559179377_a);
+			}
+
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -29.6010601045_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -32.1491393735_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -32.2420958089_a);
 			}
 		}
 		
