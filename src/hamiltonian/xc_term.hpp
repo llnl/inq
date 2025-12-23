@@ -349,6 +349,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		auto grad_unp = std::optional{operations::gradient(density_unp)};
 		auto grad_pol = std::optional{operations::gradient(density_pol)};
 
+		auto lapl_unp = std::optional{operations::laplacian(density_unp)};
+		auto lapl_pol = std::optional{operations::laplacian(density_pol)};
+
 		if(contains1) {
 			CHECK(density_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0232053167_a);
 		
@@ -375,8 +378,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, efunc_pol, vfunc_pol);
 
 			CHECK(efunc_unp == -14.0558385758_a);
 			CHECK(efunc_pol == -15.1680272137_a);
@@ -406,8 +409,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, efunc_pol, vfunc_pol);
 
 			CHECK(efunc_unp == -1.8220292936_a);
 			CHECK(efunc_pol == -1.5670264162_a);
@@ -437,8 +440,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, efunc_pol, vfunc_pol);
 
 			CHECK(efunc_unp == -13.2435562623_a);
 			CHECK(efunc_pol == -13.838126858_a);
