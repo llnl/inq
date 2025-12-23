@@ -151,7 +151,7 @@ public:
 		for(auto & func : functionals_){
 			if(not func.true_functional()) continue;
 
-			evaluate_functional(func, full_density, density_gradient, density_laplacian, efunc, vfunc);
+			evaluate_functional(func, full_density, density_gradient, density_laplacian, kinetic_energy_density, efunc, vfunc);
 			compute_vxc(spin_density, vfunc, vxc);
 
 			exc += efunc;
@@ -198,8 +198,9 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////
 
-	template <typename Density, typename DensityGradient, typename DensityLaplacian>
-	static void evaluate_functional(hamiltonian::xc_functional const & functional, Density const & density, DensityGradient const & density_gradient, DensityLaplacian const & density_laplacian,
+	template <typename Density, typename DensityGradient, typename DensityLaplacian, typename KineticEnergyDensity>
+	static void evaluate_functional(hamiltonian::xc_functional const & functional,
+																	Density const & density, DensityGradient const & density_gradient, DensityLaplacian const & density_laplacian, KineticEnergyDensity const & kinetic_energy_density,
 																	double & efunctional, basis::field_set<basis::real_space, double> & vfunctional){
 		CALI_CXX_MARK_FUNCTION;
 
@@ -323,7 +324,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	
 		basis::field_set<basis::real_space, double> density_unp(bas, 1);  
 		basis::field_set<basis::real_space, double> density_pol(bas, 2);
-	
+
+		auto ked_unp = std::optional{basis::field_set<basis::real_space, double>(bas, 1)};
+		auto ked_pol = std::optional{basis::field_set<basis::real_space, double>(bas, 2)};
+		
 		//Define k-vector for test function
 		auto kvec = 2.0*M_PI*vector3<double>(1.0/lx, 1.0/ly, 1.0/lz);
 	
@@ -332,12 +336,18 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		};
 
 		gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
-						 [point_op = bas.point_op(), dunp = begin(density_unp.hypercubic()), dpol = begin(density_pol.hypercubic()), ff, kvec] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+						 [point_op = bas.point_op(), dunp = begin(density_unp.hypercubic()), dpol = begin(density_pol.hypercubic()),
+							kunp = begin(ked_unp->hypercubic()), kpol = begin(ked_pol->hypercubic()), ff, kvec] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 							 auto vec = point_op.rvector_cartesian(ix, iy, iz);
 							 dunp[ix][iy][iz][0] = ff(kvec, vec);
 							 auto pol = sin(norm(vec)/100.0);
 							 dpol[ix][iy][iz][0] = (1.0 - pol)*ff(kvec, vec);
 							 dpol[ix][iy][iz][1] = pol*ff(kvec, vec);
+
+							 //just put something in the kinetic energy density, I am not sure this makes physical sense
+							 kunp[ix][iy][iz][0] = 0.5*pow(dunp[ix][iy][iz][0], 2);
+							 kpol[ix][iy][iz][0] = 0.5*pow(dpol[ix][iy][iz][1], 2);
+							 kpol[ix][iy][iz][1] = 0.5*pow(dpol[ix][iy][iz][0], 2);
 						 });
 		
 		observables::density::normalize(density_unp, 42.0);
@@ -378,8 +388,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
 
 			CHECK(efunc_unp == -14.0558385758_a);
 			CHECK(efunc_pol == -15.1680272137_a);
@@ -409,8 +419,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
 
 			CHECK(efunc_unp == -1.8220292936_a);
 			CHECK(efunc_pol == -1.5670264162_a);
@@ -440,8 +450,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double efunc_unp = NAN;
 			double efunc_pol = NAN;
 		
-			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, efunc_unp, vfunc_unp);
-			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, efunc_pol, vfunc_pol);
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol);
 
 			CHECK(efunc_unp == -13.2435562623_a);
 			CHECK(efunc_pol == -13.838126858_a);
@@ -460,6 +470,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.352403833_a);
 			}
 		}
+		
 	}
 
 	SECTION("xc_term object") {
