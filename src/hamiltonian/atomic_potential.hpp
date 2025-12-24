@@ -247,10 +247,9 @@ namespace hamiltonian {
 									 [dens = begin(density.hypercubic()), sph = sphere.ref(), spline = ps.electronic_density().function(), pol = polarization, nspin] GPU_LAMBDA (auto ipoint){
 										 auto rr = sph.distance(ipoint);
 										 auto density_val = spline(rr);
-										 auto pol = polarization;
-										 if(ispin > 1) return;
-										 if(ispin == 1) pol = 1.0 - pol;
-										 gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin]) += pol*density_val;
+										 for (auto ispin = 0; ispin < nspin; ispin++) {
+											gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin]) += density_val*pol[ispin];
+										 }
 									 });
 
 				} else {
@@ -258,12 +257,12 @@ namespace hamiltonian {
 					//just some crude guess for now
 					basis::spherical_grid sphere(basis, atom_position, 3.0);
 					
-					gpu::run(nspin, sphere.size(),
-									 [dens = begin(density.hypercubic()), sph = sphere.ref(), zval = ps.valence_charge(), pol = polarization, nspin] GPU_LAMBDA (auto ispin, auto ipoint){
+					gpu::run(sphere.size(),
+									 [dens = begin(density.hypercubic()), sph = sphere.ref(), zval = ps.valence_charge(), pol = polarization, nspin] GPU_LAMBDA (auto ipoint){
 										 auto rr = sph.distance(ipoint);
-										 auto pol = polarization;
-										 if(ispin == 1) pol = 1.0 - pol;
-										 gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin]) += pol*zval/(M_PI)*exp(-2.0*rr);
+										 for (auto ispin = 0; ispin < nspin; ispin++) {
+											gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]][ispin]) += zval/(M_PI)*exp(-2.0*rr)*pol[ispin];
+										 }
 									 });
 					
 				}
