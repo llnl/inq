@@ -185,7 +185,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(ldafunctional.name() == "Slater exchange");
 		CHECK(ldafunctional.kind_name() == "Exchange");
 		CHECK(ldafunctional.family_name() == "LDA");
-		CHECK(ldafunctional.references() == "[1] P. A. M. Dirac, Math. Proc. Cambridge Philos. Soc. 26, 376 (1930)\n[2] F. Bloch, Z. Phys. 57, 545 (1929)\n");
+		CHECK(ldafunctional.references() == "[1] P. A. M. Dirac.,  Math. Proc. Cambridge Philos. Soc. 26, 376 (1930)\n[2] F. Bloch.,  Z. Phys. 57, 545 (1929)\n");
 	}
 
 	SECTION("LSDA"){
