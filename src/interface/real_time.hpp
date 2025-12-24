@@ -10,6 +10,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <input/environment.hpp>
+#include <interface/runtime_options.hpp>
 #include <systems/electrons.hpp>
 
 namespace inq {
@@ -197,7 +198,7 @@ simulations. These are the available options:
 	}
 	
 	template <typename ArgsType>
-	void command(ArgsType args, bool quiet) const {
+	void command(ArgsType args, runtime_options const & run_opts) const {
 		using utils::str_to;
 		
 		if(args.size() == 0) {
@@ -207,19 +208,19 @@ simulations. These are the available options:
 
 		if(args.size() == 3 and (args[0] == "time-step")){
 			time_step(magnitude::time::parse(str_to<double>(args[1]), args[2]));
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
 		if(args.size() == 3 and (args[0] == "propagation-time")){
 			propagation_time(magnitude::time::parse(str_to<double>(args[1]), args[2]));
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 				
 		if(args.size() == 2 and (args[0] == "num-steps")){
 			num_steps(str_to<long>(args[1]));
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
@@ -228,19 +229,19 @@ simulations. These are the available options:
 
 			if(args.size() == 1 and args[0] == "static"){
 				ions_static();
-				if(not quiet) operator()();
+				if(not run_opts.quiet) operator()();
 				actions::normal_exit();
 			}
 			
 			if(args.size() == 1 and args[0] == "impulsive"){
 				ions_impulsive();
-				if(not quiet) operator()();
+				if(not run_opts.quiet) operator()();
 				actions::normal_exit();
 			}
 			
 			if(args.size() == 1 and args[0] == "ehrenfest"){
 				ions_ehrenfest();
-				if(not quiet) operator()();
+				if(not run_opts.quiet) operator()();
 				actions::normal_exit();
 			}
 			
@@ -252,19 +253,19 @@ simulations. These are the available options:
 			
 			if(args.size() == 1 and args[0] == "dipole"){
 				observables_dipole();
-				if(not quiet) operator()();
+				if(not run_opts.quiet) operator()();
 				actions::normal_exit();
 			}
 			
 			if(args.size() == 1 and args[0] == "current"){
 				observables_current();
-				if(not quiet) operator()();
+				if(not run_opts.quiet) operator()();
 				actions::normal_exit();
 			}
 			
 			if(args.size() == 1 and args[0] == "clear"){
 				observables_clear();
-				if(not quiet) operator()();
+				if(not run_opts.quiet) operator()();
 				actions::normal_exit();
 			}
 			

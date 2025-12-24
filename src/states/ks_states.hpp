@@ -3,7 +3,7 @@
 #ifndef INQ__STATES__KS_STATES
 #define INQ__STATES__KS_STATES
 
-// Copyright (C) 2019-2023 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
+// Copyright (C) 2019-2025 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -156,7 +156,7 @@ public:
 		auto feig = eigenval.flatted();
 		auto focc = occs.flatted();
 
-		auto kweights = gpu::array<double, 2>{occs.extensions()};
+		auto kweights = gpu::array<double, 2>(occs.extensions());
 		gpu::run((~kweights).size(), kweights.size(),
 						 [kw = begin(kweights), kp = begin(kpin_weights)] GPU_LAMBDA (auto ii, auto jj){
 							 kw[jj][ii] = kp[jj];

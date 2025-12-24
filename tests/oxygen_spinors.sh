@@ -23,15 +23,15 @@ inq theory non interacting
 
 inq run ground-state
 
-inq util match `inq results ground-state energy total`           -72.587780837035 1e-5
-inq util match `inq results ground-state energy kinetic`          35.942275641284 1e-5
-inq util match `inq results ground-state energy eigenvalues`     -88.331896202714 1e-5
-inq util match `inq results ground-state energy hartree`           0.000000000000 1e-5
-inq util match `inq results ground-state energy external`       -116.686239321533 1e-5
-inq util match `inq results ground-state energy non-local`        -7.587932522466 1e-5
-inq util match `inq results ground-state energy xc`                0.000000000000 1e-5
-inq util match `inq results ground-state energy nvxc`              0.000000000000 1e-5
-inq util match `inq results ground-state energy exact-exchange`    0.000000000000 1e-5
-inq util match `inq results ground-state energy ion`              15.744115365679 1e-5
+inq util match `inq results ground-state energy total`           -72.791683032666  1e-5
+inq util match `inq results ground-state energy kinetic`          38.816741021443  1e-5
+inq util match `inq results ground-state energy eigenvalues`     -88.535798398345  1e-5
+inq util match `inq results ground-state energy hartree`           0.000000000000  1e-5
+inq util match `inq results ground-state energy external`       -117.780218905984  1e-5
+inq util match `inq results ground-state energy non-local`        -9.572320513805  1e-5
+inq util match `inq results ground-state energy xc`                0.000000000000  1e-5
+inq util match `inq results ground-state energy nvxc`              0.000000000000  1e-5
+inq util match `inq results ground-state energy exact-exchange`    0.000000000000  1e-5
+inq util match `inq results ground-state energy ion`              15.744115365679  1e-5
 
 inq util match  `inq results ground-state magnetization`  0.000000000000 0.000000000000 0.000000001822  1e-5

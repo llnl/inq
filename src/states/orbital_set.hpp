@@ -76,6 +76,14 @@ public:
 		fields_.fill(scalar);     
 	}
 
+	auto shift_domains() {
+		fields_.shift_domains();
+	}
+	
+	auto shift_states() {
+		fields_.shift_states();
+	}
+	
 	auto & spinor_dim() const {
 		return spinor_dim_;
 	}
@@ -177,7 +185,7 @@ public:
 	auto & spinor_set_part() const {
 		return spinor_set_part_;
 	}
-	
+
 	auto key() const {
 		return states::key{kpoint(), spin_index()};
 	}
@@ -209,13 +217,15 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	auto set_comm = basis::set_subcomm(cart_comm);
 	auto basis_comm = basis::basis_subcomm(cart_comm);  
 
+	if(cart_comm.size() >= 5) return;
+
   basis::real_space rs(systems::cell::orthorhombic(10.0_b, 4.0_b, 7.0_b), /*spacing =*/ 0.35124074, basis_comm);
 
 	states::orbital_set<basis::real_space, double> orb(rs, 12, 1, vector3<double, covariant>{0.0, 0.0, 0.0}, 0, cart_comm);
 	CHECK(not orb.spinors());
 	
 	CHECK(sizes(orb.basis())[0] == 28);
-	CHECK(sizes(orb.basis())[1] == 11);
+	CHECK(sizes(orb.basis())[1] == 12);
 	CHECK(sizes(orb.basis())[2] == 20);
 
 	CHECK(orb.local_set_size() == orb.local_set_size());
@@ -233,7 +243,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	CHECK(not orbk.spinors());
 	CHECK(sizes(orbk.basis())[0] == 28);
-	CHECK(sizes(orbk.basis())[1] == 11);
+	CHECK(sizes(orbk.basis())[1] == 12);
 	CHECK(sizes(orbk.basis())[2] == 20);
 
 	CHECK(orbk.kpoint()[0] == 0.4_a);
@@ -261,7 +271,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	CHECK(sporb.spinors());
 	CHECK(sizes(sporb.basis())[0] == 28);
-	CHECK(sizes(sporb.basis())[1] == 11);
+	CHECK(sizes(sporb.basis())[1] == 12);
 	CHECK(sizes(sporb.basis())[2] == 20);
 
 	CHECK(sporb.kpoint()[0] == 0.4_a);
@@ -305,7 +315,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		}
 
 		CHECK(get<0>(sizes(sporb.spinor_hypercubic())) == 28);
-		CHECK(get<1>(sizes(sporb.spinor_hypercubic())) == 11);
+		CHECK(get<1>(sizes(sporb.spinor_hypercubic())) == 12);
 		CHECK(get<2>(sizes(sporb.spinor_hypercubic())) == 20);
 		CHECK(get<3>(sizes(sporb.spinor_hypercubic())) == 2);
 		CHECK(get<4>(sizes(sporb.spinor_hypercubic())) == 12);

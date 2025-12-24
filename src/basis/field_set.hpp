@@ -43,6 +43,17 @@ public:
 
 	template <typename BType, typename EType>
 	using template_type = field_set<BType, EType>;
+
+private:
+
+	mutable parallel::cartesian_communicator<2> full_comm_;
+	mutable parallel::cartesian_communicator<1> set_comm_;
+	PartitionType set_part_;
+	internal_array_type matrix_;
+	int num_vectors_;
+	basis_type basis_;
+
+public:
 	
 	field_set(const basis_type & basis, PartitionType part, parallel::cartesian_communicator<2> comm)
 		:full_comm_(std::move(comm)),
@@ -105,6 +116,39 @@ public:
 
 	auto skeleton() const {
 		return inq::utils::skeleton_wrapper<field_set<BasisType, ElementType, PartitionType>>(*this);
+	}
+
+private:
+
+	template <typename Comm, typename Part>
+	void shift(Comm & comm, Part & part, int part_rank) {
+		if(comm.size() == 1) return;
+
+		auto next_proc = (comm.rank() + 1)%comm.size();
+		auto prev_proc = comm.rank() - 1;
+		if(prev_proc == -1) prev_proc = comm.size() - 1;
+
+		auto tag = part_rank - comm.rank();
+		if(tag < 0) tag += comm.size();
+		assert(tag >= 0 and tag < comm.size());
+		
+		auto mpi_type = boost::mpi3::detail::basic_datatype<element_type>();
+		auto buffer = internal_array_type({basis_.part().max_local_size(), set_part_.max_local_size()});
+		buffer({0, basis_.part().local_size()}, {0, set_part_.local_size()}) = matrix_({0, basis_.part().local_size()}, {0, set_part_.local_size()});
+		MPI_Sendrecv_replace(raw_pointer_cast(buffer.data_elements()), buffer.num_elements(), mpi_type, prev_proc, tag, next_proc, tag, comm.get(), MPI_STATUS_IGNORE);
+		part.shift();
+		matrix_.reextent({basis_.part().local_size(), set_part_.local_size()});
+		matrix_ = buffer({0, basis_.part().local_size()}, {0, set_part_.local_size()});
+	}
+	
+public:
+
+	void shift_domains() {
+		shift(basis_.comm(), basis_, basis_.part().rank());
+	}
+
+	void shift_states() {
+		shift(set_comm_, set_part_, set_part_.rank());
 	}
 
 	template <class OtherType, class AnyPartType>
@@ -200,18 +244,9 @@ public:
 	template <typename CommunicatorType, typename OpType = std::plus<>>
 	void all_reduce(CommunicatorType & comm, OpType op = OpType{}){
 		if(comm.size() < 2) return;
-		comm.all_reduce_n(raw_pointer_cast(matrix().data_elements()), matrix().num_elements(), op);
+		comm.all_reduce_in_place_n(raw_pointer_cast(matrix().data_elements()), matrix().num_elements(), op);
 	}
 		
-private:
-
-	mutable parallel::cartesian_communicator<2> full_comm_;
-	mutable parallel::cartesian_communicator<1> set_comm_;
-	PartitionType set_part_;
-	internal_array_type matrix_;
-	int num_vectors_;
-	basis_type basis_;
-
 };
 
 field_set<basis::real_space, inq::complex> complex_field(field_set<basis::real_space, double> const & field) {
@@ -291,30 +326,31 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	auto set_comm = basis::set_subcomm(cart_comm);
 	auto basis_comm = basis::basis_subcomm(cart_comm);  
 
-	basis::real_space rs(systems::cell::orthorhombic(10.0_b, 4.0_b, 7.0_b), /*spacing = */ 0.35124074, basis_comm);
+	basis::real_space rs(systems::cell::orthorhombic(4.0_b, 10.0_b, 7.0_b), /*spacing = */ 0.35124074, basis_comm);
 	
 	basis::field_set<basis::real_space, double> ff(rs, 12, cart_comm);
 
-	CHECK(sizes(rs)[0] == 28);
-	CHECK(sizes(rs)[1] == 11);
+	CHECK(sizes(rs)[0] == 12);
+	CHECK(sizes(rs)[1] == 28);
 	CHECK(sizes(rs)[2] == 20);
 
 	//std::cout << ff.basis().comm().size() << " x " << ff.set_comm().size() << std::endl;
 	//  std::cout << rs.part().comm_size() << std::endl;
 
-	if(ff.basis().comm().size() == 1) CHECK(get<0>(sizes(ff.matrix())) == 6160);
-	if(ff.basis().comm().size() == 2) CHECK(get<0>(sizes(ff.matrix())) == 6160/2);
+	if(ff.basis().comm().size() == 1) CHECK(get<0>(sizes(ff.matrix())) == 6720);
+	if(ff.basis().comm().size() == 2) CHECK(get<0>(sizes(ff.matrix())) == 6720/2);
 	if(ff.set_comm().size() == 1) CHECK(get<1>(sizes(ff.matrix())) == 12);
 	if(ff.set_comm().size() == 2) CHECK(get<1>(sizes(ff.matrix())) == 6);
 	if(ff.set_comm().size() == 3) CHECK(get<1>(sizes(ff.matrix())) == 4);
 	if(ff.set_comm().size() == 4) CHECK(get<1>(sizes(ff.matrix())) == 3);
 	if(ff.set_comm().size() == 6) CHECK(get<1>(sizes(ff.matrix())) == 2);
 
-	if(ff.basis().comm().size() == 1) CHECK(get<0>(sizes(ff.hypercubic())) == 28);
-	if(ff.basis().comm().size() == 2) CHECK(get<0>(sizes(ff.hypercubic())) == 14);
-	if(ff.basis().comm().size() == 4) CHECK(get<0>(sizes(ff.hypercubic())) == 7);
-	CHECK(get<1>(sizes(ff.hypercubic())) == 11);
+	CHECK(get<0>(sizes(ff.hypercubic())) == 12);
+	if(ff.basis().comm().size() == 1) CHECK(get<1>(sizes(ff.hypercubic())) == 28);
+	if(ff.basis().comm().size() == 2) CHECK(get<1>(sizes(ff.hypercubic())) == 14);
+	if(ff.basis().comm().size() == 4) CHECK(get<1>(sizes(ff.hypercubic())) == 7);
 	CHECK(get<2>(sizes(ff.hypercubic())) == 20);
+	
 	if(ff.set_comm().size() == 1) CHECK(get<3>(sizes(ff.hypercubic())) == 12);
 	if(ff.set_comm().size() == 2) CHECK(get<3>(sizes(ff.hypercubic())) == 6);
 
@@ -330,7 +366,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	
 	static_assert(std::is_same<decltype(zff), basis::field_set<basis::real_space, complex>>::value, "complex() should return a complex field");
 
-	CHECK(get<1>(sizes(zff.hypercubic())) == 11);
+	CHECK(get<0>(sizes(zff.hypercubic())) == 12);
 	CHECK(get<2>(sizes(zff.hypercubic())) == 20);
 
 	for(int ii = 0; ii < ff.basis().part().local_size(); ii++){
@@ -344,7 +380,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	static_assert(std::is_same<decltype(dff), basis::field_set<basis::real_space, double>>::value, "real() should return a double field");
 
-	CHECK(get<1>(sizes(dff.hypercubic())) == 11);
+	CHECK(get<0>(sizes(dff.hypercubic())) == 12);
 	CHECK(get<2>(sizes(dff.hypercubic())) == 20);
 
 	for(int ii = 0; ii < ff.basis().part().local_size(); ii++){
@@ -384,6 +420,70 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			CHECK(rr.matrix()[ii][jj] == 1.0_a);
 		}
 	}
+
+	SECTION("Shift domains") {
+		basis::field_set<basis::real_space, complex> fie(rs, 24, cart_comm);
+
+		for(auto ip = 0; ip < fie.basis().local_size(); ip++) {
+			for(auto ist = 0; ist < fie.local_set_size(); ist++) {
+				fie.matrix()[ip][ist] = double(ist + 1.0)*complex{double(fie.basis().part().start() + ip), double(basis_comm.rank())};
+			}
+		}
+
+		auto part = fie.basis().part();
+
+		for(int ishift = 0; ishift < 2*basis_comm.size(); ishift++) {
+			auto shift_rank = (basis_comm.rank() + ishift)%basis_comm.size();
+
+			CHECK(fie.basis().part().rank() == shift_rank);
+			CHECK(fie.basis().part().start() == part.start(shift_rank));
+			CHECK(fie.basis().part().local_size() == part.local_size(shift_rank));
+
+			for(auto ip = 0; ip < fie.basis().local_size(); ip++){
+				for(auto ist = 0; ist < fie.local_set_size(); ist++) {
+					CHECK(real(fie.matrix()[ip][ist]) == double(ist + 1.0)*(fie.basis().part().start() + ip));
+					CHECK(imag(fie.matrix()[ip][ist]) == double(ist + 1.0)*shift_rank);
+				}
+			}
+			
+			fie.shift_domains();
+		}
+		
+		
+	}
+	
+	SECTION("Shift states") {
+		
+		basis::field_set<basis::real_space, complex> fie(rs, 24, cart_comm);
+
+		for(auto ip = 0; ip < fie.basis().local_size(); ip++) {
+			for(auto ist = 0; ist < fie.local_set_size(); ist++) {
+				fie.matrix()[ip][ist] = double(ip + 1.0)*complex{double(fie.set_part().start() + ist), double(set_comm.rank())};
+			}
+		}
+
+		auto part = fie.set_part();
+
+		for(int ishift = 0; ishift < 2*set_comm.size(); ishift++) {
+			auto shift_rank = (set_comm.rank() + ishift)%set_comm.size();
+
+			CHECK(fie.set_part().rank() == shift_rank);
+			CHECK(fie.set_part().start() == part.start(shift_rank));
+			CHECK(fie.set_part().local_size() == part.local_size(shift_rank));
+
+			for(auto ip = 0; ip < fie.basis().local_size(); ip++){
+				for(auto ist = 0; ist < fie.local_set_size(); ist++) {
+					CHECK(real(fie.matrix()[ip][ist]) == double(ip + 1.0)*(fie.set_part().start() + ist));
+					CHECK(imag(fie.matrix()[ip][ist]) == double(ip + 1.0)*shift_rank);
+				}
+			}
+			
+			fie.shift_states();
+		}
+		
+		
+	}
+	
 	
 }
 #endif

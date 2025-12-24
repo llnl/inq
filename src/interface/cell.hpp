@@ -11,6 +11,7 @@
 
 #include <input/environment.hpp>
 #include <interface/actions.hpp>
+#include <interface/runtime_options.hpp>
 #include <systems/ions.hpp>
 
 namespace inq {
@@ -158,7 +159,7 @@ private:
 public:
 	
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 
 		using utils::str_to;
 		
@@ -176,7 +177,7 @@ public:
 			if(args.size() == 4) per = parse_periodicity(args[3]);
 			
 			cubic(aa, per);
-			if(not quiet) status();
+			if(not run_opts.quiet) status();
 			actions::normal_exit();
 		}
 		
@@ -194,7 +195,7 @@ public:
 			if(args.size() == 6) per = parse_periodicity(args[5]);
 			
 			orthorhombic(aa, bb, cc, per);
-			if(not quiet) status();
+			if(not run_opts.quiet) status();
 			actions::normal_exit();
 		}
 		
@@ -230,7 +231,7 @@ public:
 			
 			operator()(aa0, aa1, aa2, bb0, bb1, bb2, cc0, cc1, cc2, per);
 			
-			if(not quiet) status();
+			if(not run_opts.quiet) status();
 			actions::normal_exit();
 		}
 

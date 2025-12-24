@@ -142,11 +142,11 @@ public:
 			
 		auto phi_fs = operations::transform::to_fourier(phi);
 		
-		auto hphi_fs = operations::laplacian(phi_fs, -0.5, -2.0*phi.basis().cell().metric().to_contravariant(phi.kpoint() + uniform_vector_potential_));
+		auto hphi_fs = operations::laplacian(phi_fs, -0.5, -2.0*phi.basis().cell().to_contravariant(phi.kpoint() + uniform_vector_potential_));
 			
 		auto hphi = operations::transform::to_real(hphi_fs);
 
-		hamiltonian::scalar_potential_add(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().metric().norm(phi.kpoint() + uniform_vector_potential_), phi, hphi);
+		hamiltonian::scalar_potential_add(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().norm(phi.kpoint() + uniform_vector_potential_), phi, hphi);
 		exchange_(phi, hphi);
 
 		for(auto & pr : projectors_rel_) pr.apply(phi, hphi, phi.kpoint() + uniform_vector_potential_);
@@ -157,7 +157,7 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////
 
-	auto operator()(const states::orbital_set<basis::fourier_space, complex> & phi) const{
+	auto operator()(const states::orbital_set<basis::fourier_space, complex> & phi) const {
 			
 		CALI_CXX_MARK_SCOPE("hamiltonian_fourier");
 
@@ -165,7 +165,7 @@ public:
 
 		auto proj = projectors_all_.project(phi_rs, phi.kpoint() + uniform_vector_potential_);
 			
-		auto hphi_rs = hamiltonian::scalar_potential(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().metric().norm(phi.kpoint() + uniform_vector_potential_), phi_rs);
+		auto hphi_rs = hamiltonian::scalar_potential(scalar_potential_, phi.spin_index(), 0.5*phi.basis().cell().norm(phi.kpoint() + uniform_vector_potential_), phi_rs);
 		
 		exchange_(phi_rs, hphi_rs);
 
@@ -174,9 +174,40 @@ public:
 			
 		auto hphi = operations::transform::to_fourier(hphi_rs);
 
-		operations::laplacian_add(phi, hphi, -0.5, -2.0*phi.basis().cell().metric().to_contravariant(phi.kpoint() + uniform_vector_potential_));
+		operations::laplacian_add(phi, hphi, -0.5, -2.0*phi.basis().cell().to_contravariant(phi.kpoint() + uniform_vector_potential_));
 
 		return hphi;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+
+	auto kinetic_expectation_value(states::orbital_set<basis::fourier_space, complex> const & phi) const {
+		CALI_CXX_MARK_FUNCTION;
+
+		return operations::laplacian_expectation_value(phi, -0.5, -2.0*phi.basis().cell().to_contravariant(phi.kpoint() + uniform_vector_potential_));
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+
+	auto kinetic_expectation_value(states::orbital_set<basis::real_space, complex> const & phi) const {
+		CALI_CXX_MARK_FUNCTION;
+
+		auto phi_fs = operations::transform::to_fourier(phi);
+		return kinetic_expectation_value(phi_fs);
+	}
+	
+	////////////////////////////////////////////////////////////////////////////////////////////
+	
+	auto overlap(const states::orbital_set<basis::real_space, complex> & phi) const {
+			
+		CALI_CXX_MARK_SCOPE("overlap_real");
+
+		auto proj = projectors_all_.project(phi, phi.kpoint() + uniform_vector_potential_, true);
+			
+		auto sphi = phi;
+		projectors_all_.apply(proj, sphi, phi.kpoint() + uniform_vector_potential_);
+
+		return sphi;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////
@@ -254,254 +285,185 @@ public:
 
 #include <catch2/catch_all.hpp>
 #include <basis/real_space.hpp>
-
+#include <config/path.hpp>
 TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	using namespace inq;
 	using namespace inq::magnitude;	
 	using namespace Catch::literals;
-  
-	parallel::cartesian_communicator<2> cart_comm(boost::mpi3::environment::get_world_instance(), {});
+	using Catch::Approx;
 
-	auto set_comm = basis::set_subcomm(cart_comm);
-	auto basis_comm = basis::basis_subcomm(cart_comm);	
+	SECTION("Hamiltonian application") {
+		
+		parallel::cartesian_communicator<2> cart_comm(boost::mpi3::environment::get_world_instance(), {});
+		
+		auto set_comm = basis::set_subcomm(cart_comm);
+		auto basis_comm = basis::basis_subcomm(cart_comm);
+		
+		auto ions = systems::ions(systems::cell::cubic(10.0_b));
 
-	auto ions = systems::ions(systems::cell::cubic(10.0_b));
-
-	basis::real_space rs(ions.cell(), /*spacing = */ 0.49672941, basis_comm);
-
-	SECTION("Basis"){
+		basis::real_space rs(ions.cell(), /*spacing = */ 0.49672941, basis_comm);
 		
 		CHECK(rs.size() == 8000);
 		CHECK(rs.rspacing()[0] == 0.5_a);
 		CHECK(rs.rspacing()[1] == 0.5_a);	
 		CHECK(rs.rspacing()[2] == 0.5_a);
 		CHECK(rs.volume_element() == 0.125_a);
+	
+		hamiltonian::atomic_potential pot(ions.species_list(), rs.gcutoff());
+		
+		states::ks_states st(states::spin_config::UNPOLARIZED, 11.0);
+		
+		states::orbital_set<basis::real_space, complex> phi(rs, st.num_states(), 1, vector3<double, covariant>{0.0, 0.0, 0.0}, 0, cart_comm);
+		
+		auto bzone = ionic::brillouin(ions, input::kpoints::gamma());
+		
+		hamiltonian::ks_hamiltonian<double> ham(rs, bzone, st, pot, ions, 0.0);
+		
+		auto const nst = phi.local_set_size();
+
+		//Constant function
+		{
+			ham.scalar_potential().fill(0);
+			phi.fill(1.0);
+
+			auto hphi_r = ham(phi);
+			auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
+
+			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
+													 [nst, hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 
+														 auto acc_r = 0.0;
+														 auto acc_f = 0.0;
+														 for(int ist = 0; ist < nst; ist++) {
+															 acc_r += fabs(hph_r[ix][iy][iz][ist] - 0.0);
+															 acc_f += fabs(hph_f[ix][iy][iz][ist] - 0.0);
+														 }
+														 return complex{acc_r, acc_f};
+													 });
+		
+			cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
+			diff /= phi.set_size()*phi.basis().size();
+		
+			CHECK(real(diff) < 1e-14);
+			CHECK(imag(diff) < 1e-14);
+		
+		}
+		
+		//Plane wave
+		{
+		
+			double kk = 2.0*M_PI/rs.rlength()[0];
+		
+			gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+							 [kk, nst, pot = begin(ham.scalar_potential().hypercubic()), ph = begin(phi.hypercubic()), point_op = rs.point_op(),
+								part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+								 pot[ix][iy][iz][0] = 0.0;
+
+								 auto ixg = part0.local_to_global(ix);
+								 auto iyg = part1.local_to_global(iy);
+								 auto izg = part2.local_to_global(iz);
+					
+								 for(int ist = 0; ist < nst; ist++){
+								 
+									 auto istg = set_part.local_to_global(ist);
+									 double xx = point_op.rvector_cartesian(ixg, iyg, izg)[0];
+									 ph[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
+								 }
+							 });
+
+			auto hphi_r = ham(phi);
+			auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
+		
+			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
+													 [kk, nst, ph = begin(phi.hypercubic()), hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic()), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 
+														 auto acc_r = 0.0;
+														 auto acc_f = 0.0;
+														 for(int ist = 0; ist < nst; ist++){
+															 auto istg = set_part.local_to_global(ist);
+															 acc_r += fabs(hph_r[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
+															 acc_f += fabs(hph_f[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
+														 }
+														 return complex{acc_r, acc_f};
+													 });
+		
+			cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
+			diff /= phi.set_size()*phi.basis().size();
+
+			CHECK(real(diff) < 1e-14);
+			CHECK(imag(diff) < 1e-14);
+		
+		}
+
+		//Harmonic oscillator
+		{
+			double ww = 2.0;
+
+			gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
+							 [ww, nst, pot = begin(ham.scalar_potential().hypercubic()), ph = begin(phi.hypercubic()), point_op = rs.point_op(),
+								part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+
+								 auto ixg = part0.local_to_global(ix);
+								 auto iyg = part1.local_to_global(iy);
+								 auto izg = part2.local_to_global(iz);
+							 
+								 double r2 = point_op.r2(ixg, iyg, izg);
+								 pot[ix][iy][iz][0] = 0.5*ww*ww*r2;
+							 
+								 for(int ist = 0; ist < nst; ist++) ph[ix][iy][iz][ist] = exp(-ww*r2);
+							 });
+
+			auto hphi_r = ham(phi);
+			auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
+		
+			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
+													 [ww, nst, ph = begin(phi.hypercubic()), hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+														 auto acc_r = 0.0;
+														 auto acc_f = 0.0;
+														 for(int ist = 0; ist < nst; ist++)	{
+															 acc_r += fabs(hph_r[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
+															 acc_f += fabs(hph_f[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
+														 }
+														 return complex{acc_r, acc_f};
+													 });
+		
+			cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
+			diff /= phi.set_size()*phi.basis().size();
+		
+			CHECK(real(diff) == 0.0051420503_a);
+			CHECK(imag(diff) == 0.0051420503_a);
+		}
 	}
 	
-	hamiltonian::atomic_potential pot(ions.species_list(), rs.gcutoff());
-	
-	states::ks_states st(states::spin_config::UNPOLARIZED, 11.0);
+	SECTION("PAW Overlap operator"){
 
-  states::orbital_set<basis::real_space, complex> phi(rs, st.num_states(), 1, vector3<double, covariant>{0.0, 0.0, 0.0}, 0, cart_comm);
+		auto cell = systems::cell::cubic(30.0_b).finite();
+		systems::ions ions(cell);
+		ions.insert(ionic::species("C").pseudo_file(config::path::unit_tests_data() + "C_PAW.xml"), {0.0_b, 0.0_b, 0.0_b});
+		ions.insert(ionic::species("H").pseudo_file(config::path::unit_tests_data() + "H_PAW.xml"), {2.0_b, 0.0_b, 0.0_b});
+		ions.insert(ionic::species("H").pseudo_file(config::path::unit_tests_data() + "H_PAW.xml"), {0.0_b, 2.0_b, 0.0_b});
+		ions.insert(ionic::species("H").pseudo_file(config::path::unit_tests_data() + "H_PAW.xml"), {0.0_b, 0.0_b, 2.0_b});
+		ions.insert(ionic::species("C").pseudo_file(config::path::unit_tests_data() + "C_PAW.xml"), {0.0_b, 0.0_b, -10.0_b});
+		systems::electrons electrons(ions, input::kpoints::gamma(), options::electrons{}.cutoff(300.0_Ha).extra_states(0));
 
-	auto bzone = ionic::brillouin(ions, input::kpoints::gamma());
-	
-	hamiltonian::ks_hamiltonian<double> ham(rs, bzone, st, pot, ions, 0.0);
+		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0);
 
-	SECTION("Constant function"){
-		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
+		auto overlap_operator = [&ham](auto const & phi ){
+			return ham.overlap(phi);
+		};
 
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.0;
-					
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						phi.hypercubic()[ix][iy][iz][ist] = 1.0;
-					}
-				}
-			}
+		for(auto & phi : electrons.kpin()) {
+			phi.fill(1.0);
+
+			auto sphi = overlap_operator(phi);
+			operations::shift(-1.0, sphi, phi);
+			auto olap = operations::overlap(phi);
+			auto olap_array = matrix::all_gather(olap);
+
+			CHECK(real(olap_array[0][0]) == Approx(0.97031883));
+			CHECK(imag(olap_array[0][0]) == 0.0);
 		}
-		
-		auto hphi = ham(phi);
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 0.0);
-					}
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-		
-		CHECK(diff < 1e-14);
-		
 	}
-	
-	SECTION("Plane wave"){
-		
-		double kk = 2.0*M_PI/rs.rlength()[0];
-		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.0;
-					
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);	
-						auto istg = phi.set_part().local_to_global(ist);
-						
-						double xx = rs.point_op().rvector_cartesian(ixg, iyg, izg)[0];
-						phi.hypercubic()[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
-					}
-				}
-			}
-		}
-
-		auto hphi = ham(phi);
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						auto istg = phi.set_part().local_to_global(ist);
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-		
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-
-		CHECK(diff < 1e-14);
-		
 	}
-
-	SECTION("Harmonic oscillator"){
-
-		double ww = 2.0;
-
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-
-					auto ixg = rs.cubic_part(0).local_to_global(ix);
-					auto iyg = rs.cubic_part(1).local_to_global(iy);
-					auto izg = rs.cubic_part(2).local_to_global(iz);	
-					
-					double r2 = rs.point_op().r2(ixg, iyg, izg);
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.5*ww*ww*r2;
-
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						phi.hypercubic()[ix][iy][iz][ist] = exp(-ww*r2);
-					}
-					
-				}
-			}
-		}
-
-		auto hphi = ham(phi);
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 1.5*ww*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-
-		CHECK(diff == 0.0051420503_a);
-		
-	}
-
-
-	SECTION("Plane wave - fourier"){
-		
-		double kk = 2.0*M_PI/rs.rlength()[0];
-		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.0;
-					
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-
-						auto ixg = rs.cubic_part(0).local_to_global(ix);
-						auto iyg = rs.cubic_part(1).local_to_global(iy);
-						auto izg = rs.cubic_part(2).local_to_global(iz);	
-						auto istg = phi.set_part().local_to_global(ist);
-						
-						double xx = rs.point_op().rvector_cartesian(ixg, iyg, izg)[0];
-						phi.hypercubic()[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
-					}
-				}
-			}
-		}
-
-		auto hphi = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-
-						auto istg = phi.set_part().local_to_global(ist);
-
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-
-		CHECK(diff < 1e-14);
-		
-	}
-
-	SECTION("Harmonic oscillator - fourier"){
-
-		double ww = 2.0;
-
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-
-					auto ixg = rs.cubic_part(0).local_to_global(ix);
-					auto iyg = rs.cubic_part(1).local_to_global(iy);
-					auto izg = rs.cubic_part(2).local_to_global(iz);	
-					
-					double r2 = rs.point_op().r2(ixg, iyg, izg);
-					ham.scalar_potential().hypercubic()[ix][iy][iz][0] = 0.5*ww*ww*r2;
-
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						phi.hypercubic()[ix][iy][iz][ist] = exp(-ww*r2);
-					}
-					
-				}
-			}
-		}
-
-		auto hphi = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.local_set_size(); ist++){
-						diff += fabs(hphi.hypercubic()[ix][iy][iz][ist] - 1.5*ww*phi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		diff /= hphi.set_size()*hphi.basis().size();
-
-		CHECK(diff == 0.0051420503_a);
-		
-	}
-	
-}
 #endif

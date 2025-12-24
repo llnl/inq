@@ -30,9 +30,9 @@ void laplacian_add(FieldSetType const & ff, FieldSetType & laplff, FactorType fa
 			
 	gpu::run(laplff.set_part().local_size(), laplff.basis().local_sizes()[2], laplff.basis().local_sizes()[1], laplff.basis().local_sizes()[0],
 					 [point_op = ff.basis().point_op(), laplffcub = begin(laplff.hypercubic()), ffcub = begin(ff.hypercubic()), factor, gradcoeff]
-					 GPU_LAMBDA (auto ist, auto iz, auto iy, auto ix){
-						 auto lapl = factor*(-point_op.g2(ix, iy, iz) + dot(gradcoeff, point_op.gvector(ix, iy, iz)));
-						 laplffcub[ix][iy][iz][ist] += lapl*ffcub[ix][iy][iz][ist];
+					 GPU_LAMBDA (auto ist, auto i2, auto i1, auto i0){
+						 auto lapl = factor*(-point_op.g2(i0, i1, i2) + dot(gradcoeff, point_op.gvector(i0, i1, i2)));
+						 laplffcub[i0][i1][i2][ist] += lapl*ffcub[i0][i1][i2][ist];
 					 });
 	
 }
@@ -48,9 +48,9 @@ void laplacian_in_place(FieldSetType & ff, FactorType factor = 1.0, vector3<doub
 
 	gpu::run(ff.set_part().local_size(), ff.basis().local_sizes()[2], ff.basis().local_sizes()[1], ff.basis().local_sizes()[0],
 					 [point_op = ff.basis().point_op(),
-						ffcub = begin(ff.hypercubic()), factor, gradcoeff] GPU_LAMBDA (auto ist, auto iz, auto iy, auto ix){
-						 auto lapl = factor*(-point_op.g2(ix, iy, iz) + dot(gradcoeff, point_op.gvector(ix, iy, iz)));						 
-						 ffcub[ix][iy][iz][ist] = ffcub[ix][iy][iz][ist]*lapl;
+						ffcub = begin(ff.hypercubic()), factor, gradcoeff] GPU_LAMBDA (auto ist, auto i2, auto i1, auto i0){
+						 auto lapl = factor*(-point_op.g2(i0, i1, i2) + dot(gradcoeff, point_op.gvector(i0, i1, i2)));
+						 ffcub[i0][i1][i2][ist] = ffcub[i0][i1][i2][ist]*lapl;
 					 });
 }
 
@@ -71,14 +71,53 @@ FieldSetType laplacian(FieldSetType const & ff, FactorType factor = 1.0, vector3
 		
 		gpu::run(laplff.set_part().local_size(), laplff.basis().local_sizes()[2], laplff.basis().local_sizes()[1], laplff.basis().local_sizes()[0],
 						 [point_op = ff.basis().point_op(), laplffcub = begin(laplff.hypercubic()), ffcub = begin(ff.hypercubic()), factor, gradcoeff]
-						 GPU_LAMBDA (auto ist, auto iz, auto iy, auto ix){
-						 auto lapl = factor*(-point_op.g2(ix, iy, iz) + dot(gradcoeff, point_op.gvector(ix, iy, iz)));
-						 laplffcub[ix][iy][iz][ist] = lapl*ffcub[ix][iy][iz][ist];
+						 GPU_LAMBDA (auto ist, auto i2, auto i1, auto i0){
+							 auto lapl = factor*(-point_op.g2(i0, i1, i2) + dot(gradcoeff, point_op.gvector(i0, i1, i2)));
+							 laplffcub[i0][i1][i2][ist] = lapl*ffcub[i0][i1][i2][ist];
 						 });
 		
 		return laplff;
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <typename FieldSetType, typename FactorType = double>
+gpu::array<double, 1> laplacian_expectation_value(FieldSetType & ff, FactorType factor = 1.0, vector3<double, contravariant> const & gradcoeff = {0.0, 0.0, 0.0}){
+
+	CALI_CXX_MARK_FUNCTION;
+
+	static_assert(std::is_same_v<typename FieldSetType::basis_type, basis::fourier_space>, "Only implemented for fourier_space");
+
+	
+	auto k2 = -0.25*ff.basis().cell().dot(gradcoeff, gradcoeff);
+	
+	auto evs = gpu::run(ff.local_set_size(), gpu::reduce(ff.basis().local_sizes()[2]), gpu::reduce(ff.basis().local_sizes()[1]), gpu::reduce(ff.basis().local_sizes()[0]), 0.0,
+											[point_op = ff.basis().point_op(), ffcub = begin(ff.hypercubic()), fac = factor*ff.basis().volume_element(), gradcoeff, k2]
+											GPU_LAMBDA (auto ist, auto i2, auto i1, auto i0){
+												auto lapl = fac*(-point_op.g2(i0, i1, i2) + dot(gradcoeff, point_op.gvector(i0, i1, i2)) + k2);
+												return real(conj(ffcub[i0][i1][i2][ist])*lapl*ffcub[i0][i1][i2][ist]);
+											});
+	
+	if(ff.spinor_dim() == 2) {
+		auto spinor_evs = decltype(evs)(ff.local_spinor_set_size());
+		gpu::run(ff.local_spinor_set_size(), [sev = begin(spinor_evs), ev = begin(evs), nst = ff.local_spinor_set_size()] GPU_LAMBDA (auto ist) {
+			sev[ist] = ev[ist] + ev[ist + nst];
+		});
+		
+		evs = std::move(spinor_evs);
+	}
+
+	if(ff.basis().comm().size() > 1) {
+		ff.basis().comm().all_reduce_in_place_n(raw_pointer_cast(evs.data_elements()), evs.num_elements(), std::plus<>{});
+	}
+	
+	return evs;
+	
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 }
 }
@@ -187,7 +226,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			return -norm(kk)*ff(kk, rr);
 		};
 
-		CHECK(norm(kvec) == Approx(rs.cell().metric().norm(rs.cell().metric().to_covariant(kvec))));
+		CHECK(norm(kvec) == Approx(rs.cell().norm(rs.cell().to_covariant(kvec))));
 		
 		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
@@ -241,7 +280,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		
 		basis::field_set<basis::real_space, complex> func(rs, 13, cart_comm);
 	
-		auto kvec = rs.cell().metric().to_cartesian(2.0*rs.cell().reciprocal(2) + 3.0*rs.cell().reciprocal(2) - 1.0*rs.cell().reciprocal(2));
+		auto kvec = rs.cell().to_cartesian(2.0*rs.cell().reciprocal(2) + 3.0*rs.cell().reciprocal(2) - 1.0*rs.cell().reciprocal(2));
 		
 		auto ff = [] (auto & kk, auto & rr){
 			return exp(inq::complex(0.0, 1.0)*dot(kk, rr));
@@ -251,7 +290,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			return -norm(kk)*ff(kk, rr);
 		};
 
-		CHECK(norm(kvec) == Approx(rs.cell().metric().norm(rs.cell().metric().to_covariant(kvec))));
+		CHECK(norm(kvec) == Approx(rs.cell().norm(rs.cell().to_covariant(kvec))));
 		
 		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){

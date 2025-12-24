@@ -21,134 +21,146 @@ namespace basis {
 
 class real_space;
 
-  class fourier_space : public grid{
+class fourier_space : public grid{
 
-  public:
+	bool reverse_;
+	systems::cell cell_;
+	
+public:
 
-		using reciprocal_space = real_space;
+	using reciprocal_space = real_space;
 		
-    fourier_space(const grid & grid_basis):
-			grid(grid_basis){
-			
-			cubic_part_ = {inq::parallel::partition(nr_[0]), inq::parallel::partition(nr_[1]), inq::parallel::partition(nr_[2], comm())};
+	fourier_space(real_space const & rs):
+		grid({rs.sizes()[(rs.comm().size() > 1)?2:0], rs.sizes()[1], rs.sizes()[(rs.comm().size() > 1)?0:2]}, rs.comm(), /*par_dim = */ 2),
+		reverse_(rs.comm().size() > 1),
+		cell_(rs.cell())
+	{
+	}
 
-			base::part_ = cubic_part_[2];
-			base::part_ *= nr_[0]*long(nr_[1]);
-			
-			for(int idir = 0; idir < 3; idir++) nr_local_[idir] = cubic_part_[idir].local_size();			
-    }
+	constexpr static auto covspacing(int) {
+		return 2.0*M_PI;
+	}
+	
+	auto & cell() const {
+		return cell_;
+	}
 
-		auto volume_element() const {
-			return cell().volume()/(size()*size());
-
-		}
+	auto volume_element() const {
+		return cell().volume()/(size()*size());
+	}
 		
-		friend auto operator==(const fourier_space & fs1, const fourier_space & fs2){
-			bool equal = fs1.nr_[0] == fs2.nr_[0] and fs1.nr_[1] == fs2.nr_[1] and fs1.nr_[2] == fs2.nr_[2];
-			equal = equal and fs1.covspacing_[0] == fs2.covspacing_[0];
-			equal = equal and fs1.covspacing_[1] == fs2.covspacing_[1];
-			equal = equal and fs1.covspacing_[2] == fs2.covspacing_[2];
-			return equal;
-		}
+	friend auto operator==(const fourier_space & fs1, const fourier_space & fs2){
+		return fs1.cell_ == fs2.cell_ and fs1.sizes_[0] == fs2.sizes_[0] and fs1.sizes_[1] == fs2.sizes_[1] and fs1.sizes_[2] == fs2.sizes_[2];
+	}
+
+	auto & reverse_order() const {
+		return reverse_;
+	}
+	
+	class point_operator {
+
+		bool reverse_;
+		std::array<int, 3> sizes_;
+		std::array<inq::parallel::partition, 3> cubic_part_;
+		systems::cell cell_;
 		
-		class point_operator {
-
-		public:
-
-			point_operator(std::array<int, 3> const & ng, vector3<double, covariant> const & gspacing, std::array<inq::parallel::partition, 3> const & dist, systems::cell::cell_metric metric):
-				ng_(ng),
-				gspacing_(gspacing),
-				cubic_part_(dist),
-				metric_(metric)
-			{
-			}
-
-			GPU_FUNCTION auto gvector(parallel::global_index ix, parallel::global_index iy, parallel::global_index iz) const {
-				
-				//FFTW generates a grid from 0 to 2pi/h, so we convert it to a
-				//grid from -pi/h to pi/h
-				
-				auto ii = grid::to_symmetric_range(ng_, ix, iy, iz);
-				return vector3<double, covariant>{ii[0]*gspacing_[0], ii[1]*gspacing_[1], ii[2]*gspacing_[2]};
-			}
-
-			GPU_FUNCTION auto gvector(int ix, int iy, int iz) const {
-				auto ixg = cubic_part_[0].local_to_global(ix);
-				auto iyg = cubic_part_[1].local_to_global(iy);
-				auto izg = cubic_part_[2].local_to_global(iz);
-				
-				return gvector(ixg, iyg, izg);
-			}
-
-			GPU_FUNCTION auto gvector_cartesian(int ix, int iy, int iz) const {
-				return metric_.to_cartesian(gvector(ix, iy, iz));
-			}
-			
-			GPU_FUNCTION auto outside_sphere(int ix, int iy, int iz) const {
-				auto ivec = grid::to_symmetric_range(ng_, cubic_part_[0].local_to_global(ix), cubic_part_[1].local_to_global(iy), cubic_part_[2].local_to_global(iz));
-				double xx = double(ivec[0])/ng_[0];
-				double yy = double(ivec[1])/ng_[1];
-				double zz = double(ivec[2])/ng_[2];
-				return xx*xx + yy*yy + zz*zz > 0.25;
-			}
-			
-			GPU_FUNCTION const auto & gspacing() const{
-				return gspacing_;
-			}
-
-			GPU_FUNCTION bool g_is_zero(parallel::global_index ix, parallel::global_index iy, parallel::global_index iz) const {
-				return (ix.value() == 0 and iy.value() == 0 and iz.value() == 0);
-			}
-
-			GPU_FUNCTION bool g_is_zero(int ix, int iy, int iz) const {
-				auto ixg = cubic_part_[0].local_to_global(ix);
-				auto iyg = cubic_part_[1].local_to_global(iy);
-				auto izg = cubic_part_[2].local_to_global(iz);
-				
-				return g_is_zero(ixg, iyg, izg);
-			}
-			
-			GPU_FUNCTION double g2(parallel::global_index ix, parallel::global_index iy, parallel::global_index iz) const {
-				return metric_.norm(gvector(ix, iy, iz));
-			}
-			
-			GPU_FUNCTION double g2(int ix, int iy, int iz) const {
-				return metric_.norm(gvector(ix, iy, iz));
-			}
-
-			GPU_FUNCTION auto & metric() const {
-				return metric_;
-			}
-
-			GPU_FUNCTION auto to_symmetric_range(int ix, int iy, int iz) const {
-				return grid::to_symmetric_range(ng_, ix, iy, iz);
-			}
-			
-			GPU_FUNCTION auto from_symmetric_range(vector3<int> ii) const {
-				return grid::from_symmetric_range(ng_, ii);
-			}
-			
-		private:
-			
-			std::array<int, 3> ng_;
-			vector3<double, covariant> gspacing_;
-			std::array<inq::parallel::partition, 3> cubic_part_;
-			systems::cell::cell_metric metric_;
-			
-		};
-
-		auto point_op() const {
-			return point_operator{ng_, covspacing_, cubic_part_, cell_.metric()};			
+	public:
+		
+		point_operator(bool reverse, std::array<int, 3> const & nr, std::array<inq::parallel::partition, 3> const & dist, systems::cell cell):
+			reverse_(reverse),
+			sizes_(nr),
+			cubic_part_(dist),
+			cell_(cell)
+		{
 		}
 
-		template <typename ReciprocalBasis = reciprocal_space>
-		auto reciprocal() const {
-			return ReciprocalBasis(*this);
+		GPU_FUNCTION auto gvector(parallel::global_index i0, parallel::global_index i1, parallel::global_index i2) const {
+				
+			//FFTW generates a grid from 0 to 2pi/h, so we convert it to a
+			//grid from -pi/h to pi/h
+				
+			auto ii = grid::to_symmetric_range(sizes_, i0, i1, i2);
+			if(reverse_) return vector3<double, covariant>{ii[2]*covspacing(2), ii[1]*covspacing(1), ii[0]*covspacing(0)};
+			return vector3<double, covariant>{ii[0]*covspacing(0), ii[1]*covspacing(1), ii[2]*covspacing(2)};
 		}
-		
-	private:
-		
-  };
+
+		GPU_FUNCTION auto gvector(int i0, int i1, int i2) const {
+			auto i0g = cubic_part_[0].local_to_global(i0);
+			auto i1g = cubic_part_[1].local_to_global(i1);
+			auto i2g = cubic_part_[2].local_to_global(i2);
+				
+			return gvector(i0g, i1g, i2g);
+		}
+
+		GPU_FUNCTION auto gvector_cartesian(int i0, int i1, int i2) const {
+			return cell_.to_cartesian(gvector(i0, i1, i2));
+		}
+			
+		GPU_FUNCTION auto outside_sphere(int i0, int i1, int i2) const {
+			auto ivec = grid::to_symmetric_range(sizes_, cubic_part_[0].local_to_global(i0), cubic_part_[1].local_to_global(i1), cubic_part_[2].local_to_global(i2));
+			double xx = double(ivec[0])/sizes_[0];
+			double yy = double(ivec[1])/sizes_[1];
+			double zz = double(ivec[2])/sizes_[2];
+			return xx*xx + yy*yy + zz*zz > 0.25;
+		}
+			
+		GPU_FUNCTION bool g_is_zero(parallel::global_index i0, parallel::global_index i1, parallel::global_index i2) const {
+			return (i0.value() == 0 and i1.value() == 0 and i2.value() == 0);
+		}
+
+		GPU_FUNCTION bool g_is_zero(int i0, int i1, int i2) const {
+			auto i0g = cubic_part_[0].local_to_global(i0);
+			auto i1g = cubic_part_[1].local_to_global(i1);
+			auto i2g = cubic_part_[2].local_to_global(i2);
+				
+			return g_is_zero(i0g, i1g, i2g);
+		}
+			
+		GPU_FUNCTION double g2(parallel::global_index i0, parallel::global_index i1, parallel::global_index i2) const {
+			return cell_.norm(gvector(i0, i1, i2));
+		}
+			
+		GPU_FUNCTION double g2(int i0, int i1, int i2) const {
+			return cell_.norm(gvector(i0, i1, i2));
+		}
+
+		GPU_FUNCTION auto & cell() const {
+			return cell_;
+		}
+
+		GPU_FUNCTION auto to_symmetric_range(int i0, int i1, int i2) const {
+			return grid::to_symmetric_range(sizes_, i0, i1, i2);
+		}
+			
+		GPU_FUNCTION auto from_symmetric_range(vector3<int> ii) const {
+			return grid::from_symmetric_range(sizes_, ii);
+		}
+						
+		GPU_FUNCTION auto & cubic_part(int idim) const {
+			return cubic_part_[idim];
+		}
+
+		GPU_FUNCTION auto local_contains(vector3<int> const & ii) const {
+			bool contains = true;
+			for(int idir = 0; idir < 3; idir++){
+				contains = contains and cubic_part_[idir].contains(ii[idir]);
+			}
+			return contains;
+		}
+			
+	};
+
+	auto point_op() const {
+		return point_operator{reverse_, sizes_, cubic_part_, cell_};
+	}
+
+	template <typename ReciprocalBasis = reciprocal_space>
+	auto reciprocal() const {
+		if(reverse_) return ReciprocalBasis(cell_, {sizes_[2], sizes_[1], sizes_[0]}, comm_);
+		return ReciprocalBasis(cell_, {sizes_[0], sizes_[1], sizes_[2]}, comm_);
+	}
+
+};
 
 }
 }

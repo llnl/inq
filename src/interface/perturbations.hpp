@@ -10,6 +10,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <input/environment.hpp>
+#include <interface/runtime_options.hpp>
 #include <perturbations/blend.hpp>
 
 namespace inq {
@@ -143,7 +144,7 @@ These are the uses for the command:
 	}
 	
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 		using namespace magnitude;
 		using utils::str_to;
 		
@@ -155,14 +156,14 @@ These are the uses for the command:
 		if(args[0] == "clear"){
 			if(args.size() != 1) actions::error(input::environment::global().comm(), "The 'perturbations clear' command doesn't take arguments");
 			clear();
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
 		if(args[0] == "kick"){
 			if(args.size() != 4) actions::error(input::environment::global().comm(), "Invalid arguments for 'perturbations kick'");
 			kick({str_to<double>(args[1]), str_to<double>(args[2]), str_to<double>(args[3])});
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
@@ -180,7 +181,7 @@ These are the uses for the command:
 			}
 
 			laser({str_to<double>(args[1]), str_to<double>(args[2]), str_to<double>(args[3])}, freq);
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 

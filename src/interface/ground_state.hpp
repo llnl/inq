@@ -11,6 +11,7 @@
 
 #include <input/environment.hpp>
 #include <interface/actions.hpp>
+#include <interface/runtime_options.hpp>
 #include <systems/electrons.hpp>
 
 namespace inq {
@@ -108,7 +109,7 @@ calculations. These are the available options:
 	}
 	
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 		using utils::str_to;
 		
 		if(args.size() == 0) {
@@ -118,19 +119,19 @@ calculations. These are the available options:
 
 		if(args.size() == 2 and (args[0] == "max-steps")){
 			max_steps(str_to<int>(args[1]));
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 		
 		if(args.size() == 2 and (args[0] == "tolerance")){
 			tolerance(str_to<double>(args[1]));
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
 		if(args.size() == 2 and (args[0] == "mixing")){
 			mixing(str_to<double>(args[1]));
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 		

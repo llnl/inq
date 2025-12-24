@@ -32,19 +32,19 @@ namespace hamiltonian {
 		gpu::array<double, 1> occupations_;
 		gpu::array<vector3<double, covariant>, 1> kpoints_;
 		gpu::array<int, 1> kpoint_indices_;
-		std::optional<basis::field_set<basis::real_space, complex, parallel::arbitrary_partition>> orbitals_;
+		mutable std::optional<basis::field_set<basis::real_space, complex, parallel::arbitrary_partition>> orbitals_;
 		std::vector<states::orbital_set<basis::real_space, complex>> ace_orbitals_;
 		double exchange_coefficient_;
 		bool use_ace_;
-		singularity_correction sing_;
+		std::optional<singularity_correction> sing_;
 		states::index orbital_index_;
 		
   public:
 
 		exchange_operator(systems::cell const & cell, ionic::brillouin const & bzone, double const exchange_coefficient, bool const use_ace):
 			exchange_coefficient_(exchange_coefficient),
-			use_ace_(use_ace),
-			sing_(cell, bzone){
+			use_ace_(use_ace){
+			if(enabled()) sing_.emplace(cell, bzone);
 		}
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -55,17 +55,24 @@ namespace hamiltonian {
 
 			CALI_CXX_MARK_SCOPE("exchage_operator::update");
 
-			auto part = parallel::arbitrary_partition(el.max_local_set_size()*el.kpin_size(), el.kpin_states_comm());
-			
+			assert(input::parallelization::dimension_domains() == 0);
+			assert(input::parallelization::dimension_states()  == 1);
+			assert(input::parallelization::dimension_kpoints() == 2);
+
+			auto shape = el.full_comm().shape();
+			auto merged_comm = parallel::cartesian_communicator<2>(el.full_comm(), {shape[0], shape[1]*shape[2]});
+
+			if(el.full_comm().coordinates()[0] != merged_comm.coordinates()[0]) {
+				std::logic_error("INQ: failed flatten of communicator.");
+			}
+
+			auto part = parallel::arbitrary_partition(el.max_local_set_size()*el.kpin_size(), merged_comm.axis(1));
+
 			occupations_ = el.occupations().flatted();
 			kpoints_.reextent(part.local_size());
 			kpoint_indices_.reextent(part.local_size());
 
-			assert(el.states_comm().size() == 1 or el.kpin_comm().size() == 1); //this is not supported right now since we don't have a way to construct the communicator with combined dimensions
-			auto par_dim = input::parallelization::dimension_kpoints();
-			if(el.kpin_comm().size() == 1) par_dim = input::parallelization::dimension_states();
-			
-			if(not orbitals_.has_value()) orbitals_.emplace(el.states_basis(), part, el.full_comm().plane(input::parallelization::dimension_domains(), par_dim));
+			if(not orbitals_.has_value()) orbitals_.emplace(el.states_basis(), part, merged_comm);
 
 			{
 				auto ist = 0;
@@ -107,7 +114,7 @@ namespace hamiltonian {
 				}
 			}
 
-			el.kpin_states_comm().all_reduce_n(&energy, 1);
+			el.kpin_states_comm().all_reduce_in_place_n(&energy, 1);
 
 			return energy;
 		}
@@ -141,7 +148,7 @@ namespace hamiltonian {
 									 });
 				}
 
-				solvers::poisson::in_place(rhoij, -phi.kpoint() + kpt[jj], sing_(idx[jj]));
+				solvers::poisson::in_place(rhoij, -phi.kpoint() + kpt[jj], (*sing_)(idx[jj]));
 				
 				{ CALI_CXX_MARK_SCOPE("exchange_operator::mulitplication");
 					gpu::run(nst, exxphi.basis().local_size(),
@@ -168,9 +175,9 @@ namespace hamiltonian {
 				auto occ_it = parallel::array_iterator(orbitals_->set_part(), orbitals_->set_comm(), occupations_);
 				auto kpt_it = parallel::array_iterator(orbitals_->set_part(), orbitals_->set_comm(), kpoints_);
 				auto idx_it = parallel::array_iterator(orbitals_->set_part(), orbitals_->set_comm(), kpoint_indices_);
-				auto hfo_it = parallel::block_array_iterator(orbitals_->basis().local_size(), orbitals_->set_part(), orbitals_->set_comm(), orbitals_->matrix());
-				for(; hfo_it != hfo_it.end(); ++hfo_it){
-					block_exchange(factor, *hfo_it, *occ_it, *kpt_it, *idx_it, phi, exxphi);
+				for(auto ipart = 0; ipart < orbitals_->set_comm().size(); ipart++) {
+					block_exchange(factor, orbitals_->matrix(), *occ_it, *kpt_it, *idx_it, phi, exxphi);
+					orbitals_->shift_states();
 					++occ_it;
 					++kpt_it;
 					++idx_it;

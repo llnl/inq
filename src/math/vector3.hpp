@@ -100,7 +100,27 @@ public:
 	constexpr auto size() const {
 		return 3;
 	}
-		
+
+	constexpr auto empty() const {
+		return false;
+	}
+
+	auto begin() const {
+		return vec_;
+	}
+
+	auto end() const {
+		return vec_ + size();
+	}
+
+	auto begin() {
+		return vec_;
+	}
+
+	auto end() {
+		return vec_ + size();
+	}
+	
 	//TRANSFORMATION
 	template <typename Kernel>
 	void transform(Kernel transformation){
@@ -281,7 +301,7 @@ public:
 		stdvec[2] = vec_[2];
 		return stdvec;
 	}
-
+	
 };
 
 template<std::size_t Index, class T>

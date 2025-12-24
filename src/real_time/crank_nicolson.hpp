@@ -43,7 +43,8 @@ void crank_nicolson(double const time, double const dt, systems::ions & ions, sy
 	assert(not sc.has_induced_vector_potential());
 	
 	CALI_CXX_MARK_FUNCTION;
-	
+
+	operations::preconditioner prec;
 	crank_nicolson_op<decltype(ham)> op{ham, complex{0.0, 0.5*dt}};
 	crank_nicolson_op<decltype(ham)> op_rhs{ham, complex{0.0, -0.5*dt}};
 
@@ -51,9 +52,9 @@ void crank_nicolson(double const time, double const dt, systems::ions & ions, sy
 	auto const exxe_tol = 1e-6;
 
 	//calculate the right hand side with H(t)
-	std::vector<states::orbital_set<basis::real_space, complex>> rhs; 
+	std::vector<states::orbital_set<basis::fourier_space, complex>> rhs;
 	rhs.reserve(electrons.kpin_size());	
-	for(auto & phi : electrons.kpin()) rhs.emplace_back(op_rhs(phi));
+	for(auto & phi : electrons.kpin()) rhs.emplace_back(operations::transform::to_fourier(op_rhs(phi)));
 	
 	//propagate ionic positions to t + dt
 	ion_propagator.propagate_positions(dt, ions, forces);
@@ -86,17 +87,22 @@ void crank_nicolson(double const time, double const dt, systems::ions & ions, sy
 		auto res = 0.0;
 		auto iphi = 0;
 		for(auto & phi : electrons.kpin()){
-			auto ires = solvers::steepest_descent(op, operations::no_preconditioner{}, rhs[iphi], phi);
+			auto fphi = operations::transform::to_fourier(std::move(phi));
+			auto ires = solvers::steepest_descent(op, prec, rhs[iphi], fphi);
+			phi = operations::transform::to_real(std::move(fphi));
+			
 			res += ires*electrons.kpin_weights()[iphi];
 			iphi++;
 		}
 
-		if(electrons.kpin_states_comm().size() > 1) electrons.kpin_states_comm().all_reduce_n(&res, 1, std::plus<>{});
+		if(electrons.kpin_states_comm().size() > 1) electrons.kpin_states_comm().all_reduce_in_place_n(&res, 1, std::plus<>{});
 		
 		auto new_density = observables::density::calculate(electrons);
+		auto qq = observables::density::normalize(new_density, electrons.states().num_electrons());
+			
 		auto density_diff = operations::integral_sum_absdiff(electrons.spin_density(), new_density)/electrons.states().num_electrons();
 		
-		if(electrons.full_comm().root()) std::cout << istep << '\t' << density_diff << '\t' << res << '\t' << exxe_diff << std::endl;
+		if(electrons.full_comm().root()) std::cout << istep << '\t' << qq << '\t' << density_diff << '\t' << res << '\t' << exxe_diff << std::endl;
 		
 		if(density_diff < dens_tol) {
 			update_hf = true;

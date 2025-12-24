@@ -20,6 +20,7 @@ auto aliases() {
 		{ "atomicnumber"s,             "atomic-number"s            },
 		{ "calculator"s,               "calc"s                     },
 		{ "clean"s,                    "clear"s                    },
+		{ "densitycutoff"s,            "density-cutoff"s           },
 		{ "exactexchange"s,            "exact-exchange"s           },
 		{ "extraelectrons"s,           "extra-electrons"s          },
 		{ "extrastates"s,              "extra-states"s             },

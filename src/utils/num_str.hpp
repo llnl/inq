@@ -17,21 +17,21 @@
 namespace inq {
 namespace utils {
 
-auto num_to_str(long num){
+static inline auto num_to_str(long num){
 	char numcstr[12];
 	snprintf(numcstr, 11, "%010ld", num);
 	return std::string(numcstr);
 }
 
 template <typename NumType>
-auto num_to_str(std::string const & fmt, NumType const & num){
+static inline auto num_to_str(std::string const & fmt, NumType const & num){
 	std::stringstream ss;
 	tfm::format(ss, fmt.c_str(), num);
 	return ss.str();
 }
 
 template <typename Type>
-auto str_to(std::string const & str);
+static inline auto str_to(std::string const &);
 
 template <>
 auto str_to<double>(std::string const & str) {
@@ -44,11 +44,11 @@ auto str_to<long>(std::string const & str) {
 }
 
 template <>
-auto str_to<int>(std::string const & str) {
+[[maybe_unused]] auto str_to<int>(std::string const & str) {
   return int(str_to<long>(str));
 }
 
-auto str_to_index(std::string const & str) {
+static inline auto str_to_index(std::string const & str) {
 	if(str == "x") return 0;
 	if(str == "y") return 1;
 	if(str == "z") return 2;

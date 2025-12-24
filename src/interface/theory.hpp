@@ -10,6 +10,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <input/environment.hpp>
+#include <interface/runtime_options.hpp>
 #include <options/theory.hpp>
 
 namespace inq {
@@ -176,7 +177,7 @@ These are the options available:
 	}
 	
 	template <typename ArgsType>
-	void command(ArgsType args, bool quiet) const {
+	void command(ArgsType args, runtime_options const & run_opts) const {
 
 		if(args.size() == 0){
 			operator()();
@@ -221,7 +222,7 @@ These are the options available:
 			actions::error(input::environment::global().comm(), "Invalid syntax in 'theory' command");
 		}
 
-		if(not quiet) operator()();
+		if(not run_opts.quiet) operator()();
 		actions::normal_exit();
 	}
 	

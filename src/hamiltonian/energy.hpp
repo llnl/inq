@@ -20,6 +20,7 @@ namespace hamiltonian {
 
 		double ion_ = 0.0;
 		double ion_kinetic_ = 0.0;		
+		double kinetic_     = 0.0;
 		double eigenvalues_ = 0.0;
 		double external_ = 0.0;
 		double non_local_ = 0.0;
@@ -43,6 +44,16 @@ public:
 			});
 		}
 
+		template <typename Occupations, typename Array, typename Norms>
+		static double occ_sum(Occupations const & occupations, Array const & array, Norms const & norms) {
+			CALI_CXX_MARK_FUNCTION;
+			
+			assert(occupations.size() == array.size());
+			return gpu::run(gpu::reduce(array.size()), 0.0, [occ = begin(occupations), arr = begin(array), nor = begin(norms)] GPU_LAMBDA (auto ip) {
+				return occ[ip]*real(arr[ip])/real(nor[ip]);
+			});
+		}
+
 public:
 		
 		energy() = default;
@@ -54,6 +65,7 @@ public:
 
 			auto normres = gpu::array<complex, 2>({static_cast<gpu::array<complex, 2>::size_type>(el.kpin().size()), el.max_local_spinor_set_size()});
 
+			kinetic_ = 0.0;
 			eigenvalues_ = 0.0;
 			non_local_ = 0.0;
 			exact_exchange_ = 0.0;
@@ -61,6 +73,11 @@ public:
 			int iphi = 0;
 			for(auto & phi : el.kpin()){
 
+				auto kin_ev = ham.kinetic_expectation_value(phi);
+				auto norms = operations::overlap_diagonal(phi);
+
+				kinetic_ += occ_sum(el.occupations()[iphi], kin_ev, norms);
+				
 				{
 					CALI_CXX_MARK_SCOPE("energy::calculate::eigenvalues");
 					auto residual = ham(phi);
@@ -84,18 +101,23 @@ public:
 			if(el.kpin_states_comm().size() > 1){	
 				CALI_CXX_MARK_SCOPE("energy::calculate::reduce");
 
-				double red[3] = {eigenvalues_, non_local_, exact_exchange_};
-				el.kpin_states_comm().all_reduce_n(red, 3);
-				eigenvalues_ = red[0];
-				non_local_    = red[1];
-				exact_exchange_ = red[2];
+				double red[4] = {kinetic_, eigenvalues_, non_local_, exact_exchange_};
+				el.kpin_states_comm().all_reduce_in_place_n(red, 4);
+				kinetic_         = red[0];
+				eigenvalues_     = red[1];
+				non_local_       = red[2];
+				exact_exchange_  = red[3];
 			}
 
 			return normres;
 		}
 	
 		auto kinetic() const {
-			return eigenvalues_ - 2.0*hartree_ - nvxc_ - 2.0*exact_exchange_ - external_ - non_local_;
+			return kinetic_;
+		}
+
+		void kinetic(double const & val) {
+			kinetic_ = val;
 		}
 		
 		auto total() const {
@@ -188,9 +210,10 @@ public:
 			utils::create_directory(comm, dirname);
 			utils::save_value(comm, dirname + "/ion",            ion_,         error_message);
 			utils::save_value(comm, dirname + "/ion_kinetic",    ion_kinetic_, error_message);
+			utils::save_value(comm, dirname + "/kinetic",        kinetic_,        error_message);
 			utils::save_value(comm, dirname + "/eigenvalues",    eigenvalues_, error_message);
 			utils::save_value(comm, dirname + "/external",       external_,    error_message);
-			utils::save_value(comm, dirname + "/non-local",      non_local_,    error_message);
+			utils::save_value(comm, dirname + "/non-local",      non_local_,      error_message);
 			utils::save_value(comm, dirname + "/hartree",        hartree_,     error_message);
 			utils::save_value(comm, dirname + "/xc",             xc_,          error_message);
 			utils::save_value(comm, dirname + "/nvxc",           nvxc_,        error_message);
@@ -204,9 +227,10 @@ public:
 
 			utils::load_value(dirname + "/ion",             en.ion_,            error_message);
 			utils::load_value(dirname + "/ion_kinetic",     en.ion_kinetic_,    error_message);
+			utils::load_value(dirname + "/kinetic",         en.kinetic_,        error_message);
 			utils::load_value(dirname + "/eigenvalues",     en.eigenvalues_,    error_message);
 			utils::load_value(dirname + "/external",        en.external_,       error_message);
-			utils::load_value(dirname + "/non-local",       en.non_local_,       error_message);
+			utils::load_value(dirname + "/non-local",       en.non_local_,      error_message);
 			utils::load_value(dirname + "/hartree",         en.hartree_,        error_message);
 			utils::load_value(dirname + "/xc",              en.xc_,             error_message);
 			utils::load_value(dirname + "/nvxc",            en.nvxc_,           error_message);
@@ -259,6 +283,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	en.ion(1.0);
 	en.ion_kinetic(2.0);
+	en.kinetic(2.5);
 	en.eigenvalues(3.0);
 	en.external(4.0);
 	en.non_local(5.0);
@@ -269,6 +294,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	CHECK(en.ion() == 1.0);
 	CHECK(en.ion_kinetic() == 2.0);
+	CHECK(en.kinetic()     == 2.5);
 	CHECK(en.eigenvalues() == 3.0);
 	CHECK(en.external() == 4.0);
 	CHECK(en.non_local() == 5.0);
@@ -282,6 +308,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	
 	CHECK(read_en.ion() == 1.0);
 	CHECK(read_en.ion_kinetic() == 2.0);
+	CHECK(read_en.kinetic()     == 2.5);
 	CHECK(read_en.eigenvalues() == 3.0);
 	CHECK(read_en.external() == 4.0);
 	CHECK(read_en.non_local() == 5.0);

@@ -22,13 +22,14 @@ inq ground-state tolerance 1e-9
 
 inq run ground-state
 
-inq util match `inq results ground-state energy total`            -23.834202378912 3e-5
-inq util match `inq results ground-state energy kinetic`           14.428062931586 3e-5
-inq util match `inq results ground-state energy eigenvalues`        7.649418116188 3e-5
-inq util match `inq results ground-state energy hartree`            0.000000000000 3e-5
-inq util match `inq results ground-state energy external`         -12.019317709315 3e-5
-inq util match `inq results ground-state energy non-local`          5.240672893917 3e-5
-inq util match `inq results ground-state energy xc`                 0.000000000000 3e-5
-inq util match `inq results ground-state energy nvxc`               0.000000000000 3e-5
-inq util match `inq results ground-state energy exact-exchange`     0.000000000000 3e-5
-inq util match `inq results ground-state energy ion`              -31.483620495100 3e-5
+inq util match `inq results ground-state energy total`           -23.833852930943  3e-5
+inq util match `inq results ground-state energy kinetic`          14.429591319530  3e-5
+inq util match `inq results ground-state energy eigenvalues`       7.649767564156  3e-5
+inq util match `inq results ground-state energy hartree`           0.000000000000  3e-5
+inq util match `inq results ground-state energy external`        -12.018531748189  3e-5
+inq util match `inq results ground-state energy non-local`         5.238707992815  3e-5
+inq util match `inq results ground-state energy xc`                0.000000000000  3e-5
+inq util match `inq results ground-state energy nvxc`              0.000000000000  3e-5
+inq util match `inq results ground-state energy exact-exchange`    0.000000000000  3e-5
+inq util match `inq results ground-state energy ion`             -31.483620495100  3e-5
+

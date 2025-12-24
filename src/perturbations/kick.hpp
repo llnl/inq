@@ -59,7 +59,7 @@ public:
 	template <typename PhiType>
 	void zero_step(PhiType & phi) const {
 
-		auto cov_efield = phi.basis().cell().metric().to_covariant(efield_);
+		auto cov_efield = phi.basis().cell().to_covariant(efield_);
 		
 		gpu::run(phi.basis().local_sizes()[2], phi.basis().local_sizes()[1], phi.basis().local_sizes()[0],
 						 [pop = phi.basis().point_op(), ph = begin(phi.hypercubic()), cov_efield, nst = phi.set_part().local_size()] GPU_LAMBDA (auto iz, auto iy, auto ix){
@@ -132,8 +132,6 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 
-	if(comm.size() > 4) return;
-	
 	SECTION("finite"){
 	
 		const int nvec = 12;
@@ -143,7 +141,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		
 		parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 		
-		basis::real_space bas(systems::cell::orthorhombic(4.2_b, 3.5_b, 6.4_b).finite(), /*spacing =*/ 0.39770182, comm);
+		basis::real_space bas(systems::cell::orthorhombic(4.2_b, 5.5_b, 6.4_b).finite(), /*spacing =*/ 0.39770182, comm);
 		
 		CHECK(bas.cell().periodicity() == 0);
 		

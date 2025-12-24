@@ -23,16 +23,26 @@ namespace inq{
 namespace parallel {
 
 class partition {
+
+protected:
 	
+	long size_;
+	long start_;
+	long end_;
+	long bsize_;
+	int  comm_size_;
+	int  rank_;
+
 public:
 
-	auto local_size() const {
+	constexpr auto local_size() const {
 		return end_ - start_;
 	}
 	
 	partition(const long size, int comm_size, int comm_rank)
-		:comm_size_(comm_size),
-		 size_(size)
+		:size_(size),
+		 comm_size_(comm_size),
+		 rank_(comm_rank)
 	{
 		
 		bsize_ = (size_ + comm_size_ - 1)/comm_size_;
@@ -70,7 +80,7 @@ public:
 		return part;
 	}
 	
-	auto size() const {
+	constexpr auto size() const {
 		return size_;
 	}
 	
@@ -94,19 +104,19 @@ public:
 		return end(part) - start(part);
 	}
 	
-	auto parallel() const {
+	constexpr auto parallel() const {
 		return comm_size_ > 1;
 	}
 	
-	auto contains(long index) const {
+	constexpr auto contains(long index) const {
 		return start() <= index and index < end();
 	}
 
-	auto contains(long index, int part) const {
+	constexpr auto contains(long index, int part) const {
 		return start(part) <= index and index < end(part);
 	}
 
-	auto contains(parallel::global_index index) const {
+	constexpr auto contains(parallel::global_index index) const {
 		return start() <= index.value() and index.value() < end();
 	}
 
@@ -118,35 +128,38 @@ public:
 		return global_i.value() - start_;
 	}
 	
-	auto comm_size() const {
+	constexpr auto comm_size() const {
 		return comm_size_;
 	}
 
-	auto max_local_size() const {
+	constexpr auto max_local_size() const {
 		return bsize_;
 	}
 	
-	auto location(long global_i) const {
+	constexpr auto location(long global_i) const {
 		return global_i/bsize_;
 	}
 
-	auto location(global_index global_i) const {
+	constexpr auto location(global_index global_i) const {
 		return global_i.value()/bsize_;
 	}
 	
-	auto waste() const {
+	constexpr auto waste() const {
 		auto total_elements = bsize_*comm_size();
 		return (total_elements - size())/double(size());
 	}
+
+	constexpr auto & rank() const {
+		return rank_;
+	}
+
+	void shift() {
+		rank_++;
+		if(rank_ == comm_size_) rank_ = 0;
+		start_ = start(rank_);
+		end_   = end(rank_);
+	}
 	
-protected:
-	
-	long comm_size_;
-	long size_;
-	long start_;
-	long end_;
-	long bsize_;
-  
 };
 }
 }
@@ -170,6 +183,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
   
 	inq::parallel::partition part(NN, comm);
 
+	CHECK(part.comm_size() == comm.size());
+	CHECK(part.rank() == comm.rank());
+	
   auto next = comm.rank() + 1;
   if(next == comm.size()) next = 0;
   
@@ -355,6 +371,56 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 		CHECK(part.waste() == 0.1764705882_a);
 	}
+
+	SECTION("Shift"){
+		inq::parallel::partition part(17, 5, 0);
+
+		CHECK(part.max_local_size() == 4);
+
+		//part 0
+		CHECK(part.rank()       == 0);
+		CHECK(part.local_size() == 4);
+		CHECK(part.start()      == 0);
+		CHECK(part.end()        == 4);
+
+		//part 1
+		part.shift();
+		CHECK(part.rank()       == 1);
+		CHECK(part.local_size() == 4);
+		CHECK(part.start()      == 4);
+		CHECK(part.end()        == 8);
+
+		//part 2
+		part.shift();
+		CHECK(part.rank()       == 2);
+		CHECK(part.local_size() == 4);
+		CHECK(part.start()      == 8);
+		CHECK(part.end()        == 12);
+
+		//part 3
+		part.shift();
+		CHECK(part.rank()       == 3);
+		CHECK(part.local_size() == 4);
+		CHECK(part.start()      == 12);
+		CHECK(part.end()        == 16);
+
+		//part 4
+		part.shift();
+		CHECK(part.rank()       == 4);
+		CHECK(part.local_size() == 1);
+		CHECK(part.start()      == 16);
+		CHECK(part.end()        == 17);
+
+		//part 0
+		part.shift();
+		CHECK(part.rank()       == 0);
+		CHECK(part.local_size() == 4);
+		CHECK(part.start()      == 0);
+		CHECK(part.end()        == 4);
+
+	}
+
+	
 
 }
 #endif

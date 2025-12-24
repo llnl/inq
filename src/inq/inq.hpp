@@ -11,7 +11,7 @@
 
 #include <bomd/propagate.hpp>
 #include <ground_state/initial_guess.hpp>
-#include <ground_state/calculate.hpp>
+#include <ground_state/calculator.hpp>
 #include <operations/io.hpp>
 #include <real_time/propagate.hpp>
 #include <utils/match.hpp>
@@ -32,6 +32,7 @@
 #include <interface/history.hpp>
 #include <interface/ions.hpp>
 #include <interface/kpoints.hpp>
+#include <interface/parallelization.hpp>
 #include <interface/perturbations.hpp>
 #include <interface/real_time.hpp>
 #include <interface/results.hpp>

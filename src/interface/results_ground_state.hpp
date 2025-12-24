@@ -10,6 +10,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <input/environment.hpp>
+#include <interface/runtime_options.hpp>
 #include <ground_state/results.hpp>
 
 namespace inq {
@@ -287,7 +288,7 @@ These are the available subcommands:
 	}
 
 	template <typename ArgsType>
-	void command(ArgsType args, bool quiet) const {
+	void command(ArgsType args, runtime_options const & run_opts) const {
 
 		if(args.size() == 0){
 			operator()();

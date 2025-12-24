@@ -72,13 +72,16 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	using namespace inq;
 	using namespace inq::magnitude;
 	using namespace Catch::literals;
+	using Catch::Approx;
 	
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 
-	if(comm.size() > 4) return;
-	
-  basis::real_space bas(systems::cell::orthorhombic(4.2_b, 3.5_b, 6.4_b), /*spacing =*/ 0.39770182, comm);
+  basis::real_space bas(systems::cell::orthorhombic(4.2_b, 5.5_b, 6.4_b), /*spacing =*/ 0.39770182, comm);
 
+	CHECK(bas.sizes()[0] == 12);
+	CHECK(bas.sizes()[1] == 14);
+	CHECK(bas.sizes()[2] == 16);
+	
 	basis::field<basis::real_space, double> density(bas);
 
 	SECTION("Dipole x"){
@@ -95,9 +98,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	
 		auto dipole = observables::dipole(density);
 
-		CHECK(dipole[0] == 2.6692428234_a);
-		CHECK(fabs(dipole[1]) < 1e-14);
-		CHECK(fabs(dipole[2]) < 1e-14);
+		CHECK(dipole[0] == 2.6841856602_a);
+		CHECK(dipole[1] == Approx(0.0000088886).margin(1e-8));
+		CHECK(dipole[2] == Approx(0.0000007238).margin(1e-8));
 		
 	}
 	
@@ -115,9 +118,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	
 		auto dipole = observables::dipole(density);
 
-		CHECK(fabs(dipole[0]) < 1e-14);
-		CHECK(dipole[1] == 2.496792_a);
-		CHECK(dipole[2] == 5.484786_a);
+		CHECK(dipole[0] == Approx(0.0000103362).margin(1e-8));
+		CHECK(dipole[1] == 2.7680435333_a);
+		CHECK(dipole[2] == 5.5466876298_a);
 		
 	}
 
@@ -135,9 +138,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	
 		auto dipole = observables::dipole(density);
 
-		CHECK(dipole[0] == -0.0000688417_a);
-		CHECK(dipole[1] == 2.042557045_a);
-		CHECK(fabs(dipole[2]) < 1e-14);
+		CHECK(dipole[0] == Approx(-0.0000679935).margin(1e-8));		
+		CHECK(dipole[1] == 2.1599276431_a);
+		CHECK(dipole[2] == Approx(-0.0140288904).margin(1e-8));
 		
 	}
 }

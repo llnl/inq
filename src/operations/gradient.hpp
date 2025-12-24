@@ -42,9 +42,9 @@ ResultType gradient(FieldSetType const & ff, double factor = 1.0, vector3<double
 		
 		gpu::run(gradff.local_set_size(), gradff.basis().local_sizes()[2], gradff.basis().local_sizes()[1], gradff.basis().local_sizes()[0],
 						 [point_op = ff.basis().point_op(), gradffcub = begin(gradff.hypercubic()), ffcub = begin(ff.hypercubic()), factor, shift]
-						 GPU_LAMBDA (auto ist, auto iz, auto iy, auto ix){
-							 auto grad = factor*complex(0.0, 1.0)*(point_op.gvector(ix, iy, iz) + shift);
-							 gradffcub[ix][iy][iz][ist] = grad*ffcub[ix][iy][iz][ist];
+						 GPU_LAMBDA (auto ist, auto i2, auto i1, auto i0){
+							 auto grad = factor*complex(0.0, 1.0)*(point_op.gvector(i0, i1, i2) + shift);
+							 gradffcub[i0][i1][i2][ist] = grad*ffcub[i0][i1][i2][ist];
 						 });
 		return gradff;
 	}
@@ -110,7 +110,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
 					auto vec = rs.point_op().rvector_cartesian(ix, iy, iz);
 					for(int ist = 0; ist < func.local_set_size(); ist++){
-						auto anvalue = rs.cell().metric().to_covariant((ist + 1.0)*factor*gradff(kvec, vec));
+						auto anvalue = rs.cell().to_covariant((ist + 1.0)*factor*gradff(kvec, vec));
 						diff += fabs(grad.hypercubic()[ix][iy][iz][ist] - anvalue);
 					}
 				}
@@ -144,7 +144,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			return complex(0.0, 1.0)*kk*ff(kk, rr);			
 		};
 
-		CHECK(norm(kvec) == Approx(rs.cell().metric().norm(rs.cell().metric().to_covariant(kvec))));
+		CHECK(norm(kvec) == Approx(rs.cell().norm(rs.cell().to_covariant(kvec))));
 		
 		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
@@ -163,7 +163,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
 					auto vec = rs.point_op().rvector_cartesian(ix, iy, iz);
 					for(int ist = 0; ist < func.local_set_size(); ist++){
-						auto anvalue = rs.cell().metric().to_covariant((ist + 1.0)*factor*gradff(kvec, vec));
+						auto anvalue = rs.cell().to_covariant((ist + 1.0)*factor*gradff(kvec, vec));
 						diff += fabs(grad.hypercubic()[ix][iy][iz][ist] - anvalue);
 					}
 				}
@@ -184,7 +184,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		
 		basis::field_set<basis::real_space, complex> func(rs, 13, cart_comm);
 	
-		auto kvec = rs.cell().metric().to_cartesian(2.0*rs.cell().reciprocal(2) + 3.0*rs.cell().reciprocal(2) - 1.0*rs.cell().reciprocal(2));
+		auto kvec = rs.cell().to_cartesian(2.0*rs.cell().reciprocal(2) + 3.0*rs.cell().reciprocal(2) - 1.0*rs.cell().reciprocal(2));
 		
 		auto ff = [] (auto & kk, auto & rr){
 			return exp(inq::complex(0.0, 1.0)*dot(kk, rr));
@@ -194,7 +194,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			return complex(0.0, 1.0)*kk*ff(kk, rr);
 		};
 
-		CHECK(norm(kvec) == Approx(rs.cell().metric().norm(rs.cell().metric().to_covariant(kvec))));
+		CHECK(norm(kvec) == Approx(rs.cell().norm(rs.cell().to_covariant(kvec))));
 		
 		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
@@ -213,7 +213,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
 					auto vec = rs.point_op().rvector_cartesian(ix, iy, iz);
 					for(int ist = 0; ist < func.local_set_size(); ist++){
-						auto anvalue = rs.cell().metric().to_covariant((ist + 1.0)*factor*gradff(kvec, vec));
+						auto anvalue = rs.cell().to_covariant((ist + 1.0)*factor*gradff(kvec, vec));
 						diff += fabs(grad.hypercubic()[ix][iy][iz][ist] - anvalue);
 					}
 				}

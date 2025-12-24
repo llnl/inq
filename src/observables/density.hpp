@@ -23,11 +23,13 @@ namespace density {
 
 template<class occupations_array_type, class field_set_type>
 void calculate_add(const occupations_array_type & occupations, field_set_type & phi, basis::field_set<typename field_set_type::basis_type, double> & density){
+
+	assert(phi.basis() == density.basis());
 	
 	if(not phi.spinors()){
 
 		assert(phi.spin_index() < density.set_size());
-		
+
 		gpu::run(phi.basis().part().local_size(),
 						 [nst = phi.set_part().local_size(), occ = begin(occupations), ph = begin(phi.matrix()), den = begin(density.matrix()), ispin = phi.spin_index()] GPU_LAMBDA (auto ipoint){
 							 for(int ist = 0; ist < nst; ist++) den[ipoint][ispin] += occ[ist]*norm(ph[ipoint][ist]);
@@ -84,7 +86,12 @@ basis::field_set<basis::real_space, double> calculate(ElecType & elec){
 
 	int iphi = 0;
 	for(auto & phi : elec.kpin()) {
-		density::calculate_add(elec.occupations()[iphi], phi, density);
+		if(phi.basis() == density.basis()) {
+			density::calculate_add(elec.occupations()[iphi], phi, density);
+		} else {
+			auto fine_phi = operations::transfer::refine(phi, density.basis());
+			density::calculate_add(elec.occupations()[iphi], fine_phi, density);
+		}
 		iphi++;
 	}
 
@@ -96,7 +103,7 @@ basis::field_set<basis::real_space, double> calculate(ElecType & elec){
 ///////////////////////////////////////////////////////////////
 
 template <class FieldType>
-void normalize(FieldType & density, const double & total_charge){
+auto normalize(FieldType & density, const double & total_charge) -> typename FieldType::element_type {
 
 	CALI_CXX_MARK_FUNCTION;
 	
@@ -108,6 +115,7 @@ void normalize(FieldType & density, const double & total_charge){
 					 [den = begin(density.matrix()), factor = total_charge/qq] GPU_LAMBDA (auto ist, auto ip){ 
 						 den[ip][ist] *= factor;
 					 });
+	return qq;
 }
 
 ///////////////////////////////////////////////////////////////

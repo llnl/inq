@@ -189,7 +189,7 @@ public:
 		
 		if(functional.family() == XC_FAMILY_LDA){
 			xc_lda_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(), raw_pointer_cast(density.matrix().data_elements()),
-										 raw_pointer_cast(edens.linear().data_elements()), raw_pointer_cast(vfunctional.matrix().data_elements()));
+										 edens.data(), raw_pointer_cast(vfunctional.matrix().data_elements()));
 			gpu::sync();
 			
 		} else if(functional.family() == XC_FAMILY_GGA){
@@ -200,14 +200,14 @@ public:
 			basis::field_set<basis::real_space, double> vsig(sig.skeleton());
 
 			gpu::run(density.basis().local_size(),
-							 [gr = begin(density_gradient->matrix()), si = begin(sig.matrix()), metric = density.basis().cell().metric(), nsig] GPU_LAMBDA (auto ip){
-								 si[ip][0] = metric.norm(gr[ip][0]);
-								 if(nsig > 1) si[ip][1] = metric.dot(gr[ip][0], gr[ip][1]);
-								 if(nsig > 1) si[ip][2] = metric.norm(gr[ip][1]);
+							 [gr = begin(density_gradient->matrix()), si = begin(sig.matrix()), cell = density.basis().cell(), nsig] GPU_LAMBDA (auto ip){
+								 si[ip][0] = cell.norm(gr[ip][0]);
+								 if(nsig > 1) si[ip][1] = cell.dot(gr[ip][0], gr[ip][1]);
+								 if(nsig > 1) si[ip][2] = cell.norm(gr[ip][1]);
 							 });
 
 			xc_gga_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(), raw_pointer_cast(density.matrix().data_elements()), raw_pointer_cast(sig.matrix().data_elements()),
-										 raw_pointer_cast(edens.linear().data_elements()), raw_pointer_cast(vfunctional.matrix().data_elements()), raw_pointer_cast(vsig.matrix().data_elements()));
+										 edens.data(), raw_pointer_cast(vfunctional.matrix().data_elements()), raw_pointer_cast(vsig.matrix().data_elements()));
 			gpu::sync();
 
 			basis::field_set<basis::real_space, vector3<double, covariant>> term(vfunctional.skeleton());
@@ -260,79 +260,6 @@ public:
 #include <basis/real_space.hpp>
 using namespace inq;
 
-template<class occupations_array_type, class field_set_type, typename VxcType>
-void compute_psi_vxc_psi_ofr(occupations_array_type const & occupations, field_set_type const & phi, VxcType const & vxc, basis::field<basis::real_space, double> & rfield) {
-
-	assert(get<1>(sizes(phi.spinor_array())) == phi.spinor_dim());
-	assert(get<2>(sizes(phi.spinor_array())) == phi.local_spinor_set_size());
-
-	if (vxc.set_size() == 1) {
-		gpu::run(phi.local_spinor_set_size(), phi.basis().local_size(),
-			[ph = begin(phi.matrix()), rf = begin(rfield.linear()), vx=begin(vxc.matrix()), occ=begin(occupations)] GPU_LAMBDA (auto ist, auto ip) {
-				rf[ip] += occ[ist] * vx[ip][0] * norm(ph[ip][ist]);
-			});
-	}
-	else if (vxc.set_size() == 2) {
-		gpu::run(phi.local_set_size(), phi.basis().local_size(),
-			[ph = begin(phi.matrix()), rf = begin(rfield.linear()), vx = begin(vxc.matrix()), occ = begin(occupations), spi = phi.spin_index()] GPU_LAMBDA (auto ist, auto ip) {
-				rf[ip] += occ[ist] * vx[ip][spi] * norm(ph[ip][ist]);
-			});
-	}
-	else {
-		assert(vxc.set_size() == 4);
-		gpu::run(phi.local_spinor_set_size(), phi.basis().local_size(),
-			[ph = begin(phi.spinor_array()), rf = begin(rfield.linear()), vx = begin(vxc.matrix()), occ = begin(occupations)] GPU_LAMBDA (auto ist, auto ip) {
-				auto offdiag = vx[ip][2] + complex{0.0, 1.0}*vx[ip][3];
-				auto cross = 2.0*occ[ist]*real(offdiag*conj(ph[ip][1][ist])*ph[ip][0][ist]);
-				rf[ip] += occ[ist]*vx[ip][0]*norm(ph[ip][0][ist]);
-				rf[ip] += occ[ist]*vx[ip][1]*norm(ph[ip][1][ist]);
-				rf[ip] += cross;
-			});
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////
-
-template<class CommType, typename CoreDensityType, typename SpinDensityType, class occupations_array_type, class kpin_type>
-void eval_psi_vxc_psi(CommType & comm, options::theory interaction, CoreDensityType const & core_density, SpinDensityType const & spin_density, occupations_array_type const & occupations, kpin_type const & kpin, double & nvx, double & ex) {
-
-	hamiltonian::xc_term xc_(interaction, spin_density.set_size());
-
-	if (not xc_.any_true_functional()) {
-		nvx += 0.0;
-		ex += 0.0;
-	}
-	else {
-		auto full_density = xc_.process_density(spin_density, core_density);
-		double efunc = 0.0;
-		basis::field_set<basis::real_space, double> vxc(spin_density.skeleton());
-		vxc.fill(0.0);
-		
-		basis::field_set<basis::real_space, double> vfunc(full_density.skeleton());
-		auto density_gradient = std::optional<decltype(operations::gradient(full_density))>{};
-		if (xc_.any_requires_gradient()) density_gradient.emplace(operations::gradient(full_density));
-
-		for (auto & func : xc_.functionals()){
-			if (not func.true_functional()) continue;
-
-			xc_.evaluate_functional(func, full_density, density_gradient, efunc, vfunc);
-			xc_.compute_vxc(spin_density, vfunc, vxc);
-			ex += efunc;
-		}
-
-		basis::field<basis::real_space, double> rfield(vxc.basis());
-		rfield.fill(0.0);
-		int iphi = 0;
-		for (auto & phi : kpin) {
-			compute_psi_vxc_psi_ofr(occupations[iphi], phi, vxc, rfield);
-			iphi++;
-		}
-
-		rfield.all_reduce(comm);
-		nvx += operations::integral(rfield);
-	}
-}
-
 TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	using namespace inq;
@@ -342,144 +269,172 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	using Catch::Approx;
 	
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
+	
+	SECTION("Functionals"){
+		
+		if(comm.size() > 4) return; //FIXME: check the problem for size 5. It returns a multi error
+	
+		auto lx = 10.3;
+		auto ly = 13.8;
+		auto lz =  4.5;
+	
+		basis::real_space bas(systems::cell::orthorhombic(lx*1.0_b, ly*1.0_b, lz*1.0_b), /*spacing =*/ 0.40557787, comm);
 
-	if(comm.size() > 4) return; //FIXME: check the problem for size 5. It returns a multi error
+		CHECK(bas.sizes()[0] == 25);
+		CHECK(bas.sizes()[1] == 35);
+		CHECK(bas.sizes()[2] == 12);
 	
-	auto lx = 10.3;
-	auto ly = 13.8;
-	auto lz =  4.5;
-	
-	basis::real_space bas(systems::cell::orthorhombic(lx*1.0_b, ly*1.0_b, lz*1.0_b), /*spacing =*/ 0.40557787, comm);
+		//some variables for testing explicit values in a point
+		auto contains1 = bas.cubic_part(0).contains(20) and bas.cubic_part(1).contains(8) and bas.cubic_part(2).contains(4);
+		auto p1 = vector3{
+			bas.cubic_part(0).global_to_local(parallel::global_index(20)),
+			bas.cubic_part(1).global_to_local(parallel::global_index(8)),
+			bas.cubic_part(2).global_to_local(parallel::global_index(4))
+		};
 
-	basis::field_set<basis::real_space, double> density_unp(bas, 1);  
-	basis::field_set<basis::real_space, double> density_pol(bas, 2);
+		auto contains2 = bas.cubic_part(0).contains(1) and bas.cubic_part(1).contains(27) and bas.cubic_part(2).contains(3);
+		auto p2 = vector3{
+			bas.cubic_part(0).global_to_local(parallel::global_index(1)),
+			bas.cubic_part(1).global_to_local(parallel::global_index(27)),
+			bas.cubic_part(2).global_to_local(parallel::global_index(3))
+		};
 	
-	//Define k-vector for test function
-	auto kvec = 2.0*M_PI*vector3<double>(1.0/lx, 1.0/ly, 1.0/lz);
+		basis::field_set<basis::real_space, double> density_unp(bas, 1);  
+		basis::field_set<basis::real_space, double> density_pol(bas, 2);
 	
-	auto ff = [] (auto & kk, auto & rr){
-		return std::max(0.0, cos(dot(kk, rr)) + 1.0);
-	};
+		//Define k-vector for test function
+		auto kvec = 2.0*M_PI*vector3<double>(1.0/lx, 1.0/ly, 1.0/lz);
+	
+		auto ff = [] GPU_LAMBDA (auto & kk, auto & rr){
+			return std::max(0.0, cos(dot(kk, rr)) + 1.0);
+		};
 
-	for(int ix = 0; ix < bas.local_sizes()[0]; ix++){
-		for(int iy = 0; iy < bas.local_sizes()[1]; iy++){
-			for(int iz = 0; iz < bas.local_sizes()[2]; iz++){
-				auto vec = bas.point_op().rvector_cartesian(ix, iy, iz);
-				density_unp.hypercubic()[ix][iy][iz][0] = ff(kvec, vec);
-				auto pol = sin(norm(vec)/100.0);
-				density_pol.hypercubic()[ix][iy][iz][0] = (1.0 - pol)*ff(kvec, vec);
-				density_pol.hypercubic()[ix][iy][iz][1] = pol*ff(kvec, vec);
+		gpu::run(bas.local_sizes()[2], bas.local_sizes()[1], bas.local_sizes()[0],
+						 [point_op = bas.point_op(), dunp = begin(density_unp.hypercubic()), dpol = begin(density_pol.hypercubic()), ff, kvec] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+							 auto vec = point_op.rvector_cartesian(ix, iy, iz);
+							 dunp[ix][iy][iz][0] = ff(kvec, vec);
+							 auto pol = sin(norm(vec)/100.0);
+							 dpol[ix][iy][iz][0] = (1.0 - pol)*ff(kvec, vec);
+							 dpol[ix][iy][iz][1] = pol*ff(kvec, vec);
+						 });
+		
+		observables::density::normalize(density_unp, 42.0);
+		observables::density::normalize(density_pol, 42.0);
+	
+		CHECK(operations::integral_sum(density_unp) == 42.0_a);
+		CHECK(operations::integral_sum(density_pol) == 42.0_a); 
+	
+		auto grad_unp = std::optional{operations::gradient(density_unp)};
+		auto grad_pol = std::optional{operations::gradient(density_pol)};
+
+		if(contains1) {
+			CHECK(density_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0232053167_a);
+		
+			CHECK(density_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0194068103_a);
+			CHECK(density_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.0037985065_a);
+		}
+
+		if(contains2) {
+			CHECK(density_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  0.1264954137_a);
+		
+			CHECK(density_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] ==  0.1121251439_a);
+			CHECK(density_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] ==  0.0143702698_a);
+		}
+
+		basis::field_set<basis::real_space, double> vfunc_unp(bas, 1);  
+		basis::field_set<basis::real_space, double> vfunc_pol(bas, 2);
+	
+		//LDA_X
+		{
+
+			hamiltonian::xc_functional func_unp(XC_LDA_X, 1);
+			hamiltonian::xc_functional func_pol(XC_LDA_X, 2);
+		
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
+		
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+
+			CHECK(efunc_unp == -14.0558385758_a);
+			CHECK(efunc_pol == -15.1680272137_a);
+
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.2808792311_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.3334150345_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.193584872_a);
+			}
+
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.494328201_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5982758379_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.3016398853_a);
+			}
+
+		}
+
+		//PBE_C
+		{
+		
+			hamiltonian::xc_functional func_unp(XC_GGA_C_PBE, 1);
+			hamiltonian::xc_functional func_pol(XC_GGA_C_PBE, 2);
+		
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
+		
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+
+			CHECK(efunc_unp == -1.8220292936_a);
+			CHECK(efunc_pol == -1.5670264162_a);
+		
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0485682509_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.0356047498_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.0430996024_a);
+			}
+
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.0430639893_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.0216393428_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.1008833788_a);
+			}
+
+		}
+
+		//B3LYP
+		{
+		
+			hamiltonian::xc_functional func_unp(XC_HYB_GGA_XC_B3LYP, 1);
+			hamiltonian::xc_functional func_pol(XC_HYB_GGA_XC_B3LYP, 2);
+		
+			double efunc_unp = NAN;
+			double efunc_pol = NAN;
+		
+			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
+			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
+
+			CHECK(efunc_unp == -13.2435562623_a);
+			CHECK(efunc_pol == -13.838126858_a);
+		
+			if(contains1) {
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.0182716851_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.1772863551_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] ==  0.1830076554_a);
+			}
+
+			if(contains2) {
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.4348251846_a);
+			
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5046576968_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.352403833_a);
 			}
 		}
-	}
-
-	observables::density::normalize(density_unp, 42.0);
-	observables::density::normalize(density_pol, 42.0);
-	
-	CHECK(operations::integral_sum(density_unp) == 42.0_a);
-	CHECK(operations::integral_sum(density_pol) == 42.0_a); 
-	
-	auto grad_unp = std::optional{operations::gradient(density_unp)};
-	auto grad_pol = std::optional{operations::gradient(density_pol)};
-
-	if(bas.part().contains(5439)) {
-		auto index = bas.part().global_to_local(parallel::global_index(5439));
-		CHECK(density_unp.matrix()[index][0] == 0.0024885602_a);
-		CHECK(density_pol.matrix()[index][0] == 0.0009452194_a);
-		CHECK(density_pol.matrix()[index][1] == 0.0015433408_a);
-	}
-
-	basis::field_set<basis::real_space, double> vfunc_unp(bas, 1);  
-	basis::field_set<basis::real_space, double> vfunc_pol(bas, 2);
-	
-	SECTION("LDA_X"){
-
-		hamiltonian::xc_functional func_unp(XC_LDA_X, 1);
-		hamiltonian::xc_functional func_pol(XC_LDA_X, 2);
-		
-		double efunc_unp = NAN;
-		double efunc_pol = NAN;
-		
-		hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-		hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
-
-		CHECK(efunc_unp == -14.0558385758_a);
-		CHECK(efunc_pol == -15.1704508993_a);
-
-		if(bas.part().contains(5439)) {
-			auto index = bas.part().global_to_local(parallel::global_index(5439));
-			CHECK(vfunc_unp.matrix()[index][0] == -0.1334462916_a);
-			CHECK(vfunc_pol.matrix()[index][0] == -0.1217618773_a);
-			CHECK(vfunc_pol.matrix()[index][1] == -0.1433797225_a);
-		}
-
-		if(bas.part().contains(4444)) {
-			auto index = bas.part().global_to_local(parallel::global_index(4444));
-			CHECK(vfunc_unp.matrix()[index][0] == -0.3276348215_a);
-			CHECK(vfunc_pol.matrix()[index][0] == -0.3784052378_a);
-			CHECK(vfunc_pol.matrix()[index][1] == -0.2527984139_a);
-		}
-
-	}
-
-	SECTION("PBE_C"){
-		
-		hamiltonian::xc_functional func_unp(XC_GGA_C_PBE, 1);
-		hamiltonian::xc_functional func_pol(XC_GGA_C_PBE, 2);
-		
-		double efunc_unp = NAN;
-		double efunc_pol = NAN;
-		
-		hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-		hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
-
-		CHECK(efunc_unp == -1.8220292936_a);
-		CHECK(efunc_pol == -1.5664843681_a);
-
-		if(bas.part().contains(5439)) {
-			auto index = bas.part().global_to_local(parallel::global_index(5439));
-			CHECK(vfunc_unp.matrix()[index][0] == 0.0005467193_a);
-			CHECK(vfunc_pol.matrix()[index][0] == 0.0005956583_a);
-			CHECK(vfunc_pol.matrix()[index][1] == 0.0005978958_a);
-		}
-
-		if(bas.part().contains(4444)) {
-			auto index = bas.part().global_to_local(parallel::global_index(4444));
-			CHECK(vfunc_unp.matrix()[index][0] == -0.0798456253_a);
-			CHECK(vfunc_pol.matrix()[index][0] == -0.0667968142_a);
-			CHECK(vfunc_pol.matrix()[index][1] == -0.0830118308_a);
-		}
-
-	}
-
-	SECTION("B3LYP"){
-		
-		hamiltonian::xc_functional func_unp(XC_HYB_GGA_XC_B3LYP, 1);
-		hamiltonian::xc_functional func_pol(XC_HYB_GGA_XC_B3LYP, 2);
-		
-		double efunc_unp = NAN;
-		double efunc_pol = NAN;
-		
-		hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, efunc_unp, vfunc_unp);
-		hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, efunc_pol, vfunc_pol);
-
-		CHECK(efunc_unp == -13.2435562623_a);
-		CHECK(efunc_pol == -13.8397387159_a);
-
-		if(bas.part().contains(5439)) {
-			auto index = bas.part().global_to_local(parallel::global_index(5439));
-			CHECK(vfunc_unp.matrix()[index][0] == -0.6495909727_a);
-			CHECK(vfunc_pol.matrix()[index][0] == -0.6398010386_a);
-			CHECK(vfunc_pol.matrix()[index][1] == -0.6142058762_a);
-		}
-
-		if(bas.part().contains(4444)) {
-			auto index = bas.part().global_to_local(parallel::global_index(4444));
-			CHECK(vfunc_unp.matrix()[index][0] == -0.2879332051_a);
-			CHECK(vfunc_pol.matrix()[index][0] == -0.3195127242_a);
-			CHECK(vfunc_pol.matrix()[index][1] == -0.2368583776_a);
-		}
-
 	}
 
 	SECTION("xc_term object") {
@@ -497,65 +452,6 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		CHECK(pbe.any_true_functional() == true);
 
 	}
-
-	SECTION("nvxc calculation unpolarized") {
-		auto par = input::parallelization(comm);
-		auto ions = systems::ions(systems::cell::cubic(10.0_b));
-		ions.insert("H", {0.0_b, 0.0_b, 0.0_b});
-		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_unpolarized());
-		ground_state::initial_guess(ions, electrons);
-		auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), options::ground_state{}.steepest_descent().energy_tolerance(1.e-8_Ha));
-		auto nvxc = result.energy.nvxc();
-		auto exc = result.energy.xc();
-		Approx target = Approx(nvxc).epsilon(1.e-10);
-		Approx target2= Approx(exc).epsilon(1.e-10);
-
-		auto core_density_ = electrons.atomic_pot().nlcc_density(electrons.states_comm(), electrons.spin_density().basis(), ions);
-		auto nvxc2 = 0.0;
-		auto exc2 = 0.0;
-		eval_psi_vxc_psi(electrons.kpin_states_comm(), options::theory{}.lda(), core_density_, electrons.spin_density(), electrons.occupations(), electrons.kpin(), nvxc2, exc2);
-		CHECK(nvxc2 == target);
-		CHECK(exc2 == target2);
-	}
-
-	SECTION("nvxc calculation spin polarized") {
-		auto par = input::parallelization(comm);
-		auto ions = systems::ions(systems::cell::cubic(10.0_b));
-		ions.insert("H", {0.0_b, 0.0_b, 0.0_b});
-		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_polarized());
-		ground_state::initial_guess(ions, electrons);
-		auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), options::ground_state{}.steepest_descent().energy_tolerance(1.e-8_Ha));
-		auto nvxc = result.energy.nvxc();
-		auto exc = result.energy.xc();
-		Approx target = Approx(nvxc).epsilon(1.e-10);
-		Approx target2 = Approx(exc).epsilon(1.e-10);
-
-		auto core_density_ = electrons.atomic_pot().nlcc_density(electrons.states_comm(), electrons.spin_density().basis(), ions);
-		auto nvxc2 = 0.0;
-		auto exc2 = 0.0;
-		eval_psi_vxc_psi(electrons.kpin_states_comm(), options::theory{}.lda(), core_density_, electrons.spin_density(), electrons.occupations(), electrons.kpin(), nvxc2, exc2);
-		CHECK(nvxc2 == target);
-		CHECK(exc2 == target2);
-	}
-
-	SECTION("nvxc calculation spin non collinear") {
-		auto par = input::parallelization(comm);
-		auto ions = systems::ions(systems::cell::cubic(10.0_b));
-		ions.insert("H", {0.0_b, 0.0_b, 0.0_b});
-		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons);
-		auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), options::ground_state{}.steepest_descent().energy_tolerance(1.e-8_Ha));
-		auto nvxc = result.energy.nvxc();
-		auto exc = result.energy.xc();
-		Approx target = Approx(nvxc).epsilon(1.e-10);
-		Approx target2 = Approx(exc).epsilon(1.e-10);
-
-		auto core_density_ = electrons.atomic_pot().nlcc_density(electrons.states_comm(), electrons.spin_density().basis(), ions);
-		auto nvxc2 = 0.0;
-		auto exc2 = 0.0;
-		eval_psi_vxc_psi(electrons.kpin_states_comm(), options::theory{}.lda(), core_density_, electrons.spin_density(), electrons.occupations(), electrons.kpin(), nvxc2, exc2);
-		CHECK(nvxc2 == target);
-		CHECK(exc2 == target2);
-	}
+	
 }
 #endif

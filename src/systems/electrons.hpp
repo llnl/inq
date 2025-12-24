@@ -3,7 +3,7 @@
 #ifndef SYSTEMS__ELECTRONS
 #define SYSTEMS__ELECTRONS
 
-// Copyright (C) 2019-2023 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
+// Copyright (C) 2019-2025 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -143,7 +143,7 @@ public:
 		states_comm_(states_subcomm(full_comm_)),
 		states_basis_comm_(states_basis_subcomm(full_comm_)),
 		states_basis_(ions.cell(), conf.spacing_value(), basis_subcomm(full_comm_)),
-		density_basis_(states_basis_), /* disable the fine density mesh for now density_basis_(states_basis_.refine(conf.density_factor(), basis_comm_)), */
+		density_basis_(states_basis_.refine(conf.density_factor_value())),
 		spin_density_(density_basis_, states_.num_density_components()),
 		kpin_part_(kpts.size()*states_.num_spin_indices(), kpin_comm_)
 	{
@@ -293,9 +293,9 @@ public:
 			}
 			
 			logger()->info("real-space parallelization:");
-			logger()->info("  {} slices ({} points) divided among {} partitions", states_basis_.cubic_part(0).size(), states_basis_.part().size(), states_basis_.cubic_part(0).comm_size());
+			logger()->info("  {} slices ({} points) divided among {} partitions", states_basis_.cubic_part(1).size(), states_basis_.part().size(), states_basis_.cubic_part(1).comm_size());
 			logger()->info("  partition 0 has {} slices and the last partition has {} slices ({} and {} points)",
-										 states_basis_.cubic_part(0).local_size(0), states_basis_.cubic_part(0).local_size(states_basis_.part().comm_size() - 1),
+										 states_basis_.cubic_part(1).local_size(0), states_basis_.cubic_part(1).local_size(states_basis_.part().comm_size() - 1),
 										 states_basis_.part().local_size(0), states_basis_.part().local_size(states_basis_.part().comm_size() - 1));
 
 			if(states_basis_.part().local_size(states_basis_.part().comm_size() - 1) == 0) {
@@ -303,9 +303,9 @@ public:
 			}
 			
 			logger()->info("fourier-space parallelization:");
-			logger()->info("  {} slices ({} points) divided among {} partitions", fourier_basis.cubic_part(2).size(), fourier_basis.part().size(), fourier_basis.cubic_part(2).comm_size());
+			logger()->info("  {} slices ({} points) divided among {} partitions", fourier_basis.cubic_part(0).size(), fourier_basis.part().size(), fourier_basis.cubic_part(0).comm_size());
 			logger()->info("  partition 0 has {} slices and the last partition has {} slices ({} and {} points)\n",
-										 fourier_basis.cubic_part(2).local_size(0), fourier_basis.cubic_part(2).local_size(fourier_basis.part().comm_size() - 1),
+										 fourier_basis.cubic_part(0).local_size(0), fourier_basis.cubic_part(0).local_size(fourier_basis.part().comm_size() - 1),
 										 fourier_basis.part().local_size(0), fourier_basis.part().local_size(fourier_basis.part().comm_size() - 1));
 
 			if(fourier_basis.part().local_size(fourier_basis.part().comm_size() - 1) == 0) {
@@ -316,7 +316,7 @@ public:
 	}
 
 	template <typename ArrayType>
-	void update_occupations(ArrayType const eigenval) {
+	void update_occupations(ArrayType const& eigenval) {
 		states_.update_occupations(kpin_states_comm_, eigenval, kpin_weights_, occupations_);
 	}
 
@@ -364,7 +364,7 @@ public:
 
 		success = success and operations::io::load(dirname + "/spin_density",	spin_density_);
 
-		full_comm_.all_reduce_n(&success, 1, std::logical_and<>{});
+		full_comm_.all_reduce_in_place_n(&success, 1, std::logical_and<>{});
 		
 		if(success) {
 			if(logger()) logger()->info("  loading successful");
@@ -433,7 +433,7 @@ public:
 		CALI_CXX_MARK_FUNCTION;
 		
 		for(auto ik = 0; ik < brillouin_zone_.size(); ik++){
-			if(phi.basis().cell().metric().norm(phi.kpoint() - brillouin_zone_.kpoint(ik)) < 1e-10) return ik;
+			if(phi.basis().cell().norm(phi.kpoint() - brillouin_zone_.kpoint(ik)) < 1e-10) return ik;
 		}
 		assert(false);
 		return 0;
@@ -508,7 +508,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 
-	systems::ions ions(systems::cell::orthorhombic(6.0_b, 1.0_b, 6.0_b));
+	systems::ions ions(systems::cell::orthorhombic(6.0_b, 6.0_b, 1.0_b));
 
 	ions.insert("Cu", {0.0_b,  0.0_b,  0.0_b});
 	ions.insert("Cu", {1.0_b,  0.0_b,  0.0_b});

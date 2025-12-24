@@ -20,13 +20,14 @@ int main(int argc, char ** argv){
 	int pardomains = 1;
 	bool groundstate_only = false;
 	vector3<int, contravariant> reps{2, 2, 2};
+	vector3<int> kpoints{1, 1, 1};
 	int niter = 10;
 	
 	auto functional = options::theory{}.pbe();
 	
 	{
 		int opt;
-		while ((opt = getopt(argc, argv, "p:?gs:yi:")) != EOF){
+		while ((opt = getopt(argc, argv, "p:?gs:k:yi:")) != EOF){
 			switch(opt){
 			case 'p':
 				pardomains = atoi(optarg);
@@ -36,6 +37,9 @@ int main(int argc, char ** argv){
 				break;
 			case 's':
 				sscanf(optarg, "%d%*c%d%*c%d", &reps[0], &reps[1], &reps[2]);
+				break;
+			case 'k':
+				sscanf(optarg, "%d%*c%d%*c%d", &kpoints[0], &kpoints[1], &kpoints[2]);
 				break;
 			case 'y':
 				functional = options::theory{}.pbe0();
@@ -48,6 +52,7 @@ int main(int argc, char ** argv){
 				std::cerr << "-p N to set the number of processors in the domain partition (1 by default)." << std::endl;
 				std::cerr << "-g only calculate the ground state." << std::endl;
 				std::cerr << "-s NxMxK the supercell size in each direction (2x2x2 by default)." << std::endl;
+				std::cerr << "-s NxMxK the size of the kpoint grid (1x1x1 by default)." << std::endl;
 				std::cerr << "-y use the PBE0 hybrid functional (the default is PBE)." << std::endl;
 				std::cerr << "-i N to set the number of SCF iterations to run (10 by default)." << std::endl;	
 				exit(1);
@@ -83,10 +88,14 @@ int main(int argc, char ** argv){
 	
 	assert(int(ions.size()) == int(cell.size()*product(reps)));
 				 
-	systems::electrons electrons(env.par().states().domains(pardomains), ions, options::electrons{}.spacing(alat/20).extra_states(2*product(reps)).temperature(1000.0_K));
+	systems::electrons electrons(env.par().states().domains(pardomains), ions, options::electrons{}.spacing(alat/20).extra_states(2*product(reps)).temperature(1000.0_K), input::kpoints::grid(kpoints));
 	
 	auto restart_dir = "aluminum_" + std::to_string(reps[0]) + "_" + std::to_string(reps[1]) + "_" + std::to_string(reps[2]);
 
+	if(kpoints[0] != 1 and kpoints[1] != 1 and kpoints[2] != 1) {
+		restart_dir += 	"_k" + std::to_string(kpoints[0]) + "_" + std::to_string(kpoints[1]) + "_" + std::to_string(kpoints[2]);
+	}
+	
 	auto not_found_gs = groundstate_only or not electrons.try_load(restart_dir);
 
 	if(not_found_gs){

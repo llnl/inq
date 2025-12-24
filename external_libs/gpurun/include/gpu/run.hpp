@@ -12,6 +12,7 @@
 #include <inq_config.h>
 
 #include <gpu/host.hpp>
+#include <gpu/indices.hpp>
 
 #define CUDA_MAX_DIM1 2147483647ULL
 #define CUDA_MAX_DIM23 65535
@@ -69,7 +70,7 @@ void run(size_t size, kernel_type kernel){
 
 	auto blocksize = max_blocksize(run_kernel_1<kernel_type>);
 
-	unsigned nblock = (size + blocksize - 1)/blocksize;
+	unsigned nblock = num_blocks(size, blocksize);
   
 	run_kernel_1<<<nblock, blocksize>>>(size, kernel);
 	check_error(last_error());
@@ -103,7 +104,7 @@ void run(size_t sizex, size_t sizey, kernel_type kernel){
 	auto blocksize = max_blocksize(run_kernel_2<kernel_type>);
 
 	//OPTIMIZATION, this is not ideal if sizex < blocksize
-	unsigned nblock = (sizex + blocksize - 1)/blocksize;
+	unsigned nblock = num_blocks(sizex, blocksize);
 	
 	size_t dim2, dim3;
 	factorize(sizey, CUDA_MAX_DIM23, dim2, dim3);
@@ -144,7 +145,7 @@ void run(size_t sizex, size_t sizey, size_t sizez, kernel_type kernel){
 	auto blocksize = max_blocksize(run_kernel_3<kernel_type>);
 	
 	//OPTIMIZATION, this is not ideal if sizex < blocksize
-	unsigned nblock = (sizex + blocksize - 1)/blocksize;
+	unsigned nblock = num_blocks(sizex, blocksize);
 	struct dim3 dg{nblock, unsigned(sizey), unsigned(sizez)};
 	struct dim3 db{unsigned(blocksize), 1, 1};
 	run_kernel_3<<<dg, db>>>(sizex, sizey, sizez, kernel);
@@ -191,7 +192,7 @@ void run(size_t sizex, size_t sizey, size_t sizez, size_t sizew, kernel_type ker
 	auto blocksize = max_blocksize(run_kernel_4<kernel_type>);
 	
 	//OPTIMIZATION, this is not ideal if sizex < blocksize
-	unsigned nblock = (sizex + blocksize - 1)/blocksize;
+	unsigned nblock = num_blocks(sizex, blocksize);
 	struct dim3 dg{nblock, unsigned(sizey), unsigned(sizez)};
 	struct dim3 db{unsigned(blocksize), 1, 1};
 	run_kernel_4<<<dg, db>>>(sizex, sizey, sizez, sizew, kernel);
@@ -229,7 +230,7 @@ long check_run(long size){
 
 	gpu::run(size,
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii){
-						 gpu::atomic::add(&(itlist[ii]), ii + 1);
+						 gpu::atomic(itlist[ii]) += ii + 1;
 					 });
 	
 	long diff = 0;
@@ -245,8 +246,8 @@ long check_run(long size1, long size2){
 	
 	gpu::run(size1, size2, 
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii, auto jj){
-						 gpu::atomic::add(&(itlist[ii][jj][0]), ii + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][1]), jj + 1);
+						 gpu::atomic(itlist[ii][jj][0]) += ii + 1;
+						 gpu::atomic(itlist[ii][jj][1]) += jj + 1;
 					 });
 	
 	long diff = 0;
@@ -266,9 +267,9 @@ long check_run(long size1, long size2, long size3){
 
 	gpu::run(size1, size2, size3,
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii, auto jj, auto kk){
-						 gpu::atomic::add(&(itlist[ii][jj][kk][0]), ii + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][1]), jj + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][2]), kk + 1);
+						 gpu::atomic(itlist[ii][jj][kk][0]) += ii + 1;
+						 gpu::atomic(itlist[ii][jj][kk][1]) += jj + 1;
+						 gpu::atomic(itlist[ii][jj][kk][2]) += kk + 1;
 					 });
 		
 	long diff = 0;
@@ -291,10 +292,10 @@ long check_run(long size1, long size2, long size3, long size4){
 
 	gpu::run(size1, size2, size3, size4,
 					 [itlist = begin(list)] GPU_LAMBDA (auto ii, auto jj, auto kk, auto ll){
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][0]), ii + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][1]), jj + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][2]), kk + 1);
-						 gpu::atomic::add(&(itlist[ii][jj][kk][ll][3]), ll + 1);
+						 gpu::atomic(itlist[ii][jj][kk][ll][0]) += ii + 1;
+						 gpu::atomic(itlist[ii][jj][kk][ll][1]) += jj + 1;
+						 gpu::atomic(itlist[ii][jj][kk][ll][2]) += kk + 1;
+						 gpu::atomic(itlist[ii][jj][kk][ll][3]) += ll + 1;
 					 });
 		
 	long diff = 0;

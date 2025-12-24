@@ -70,11 +70,16 @@ make test
 This instructions might be incomplete for your particular setup; 
 see other possibilities in [`.gitlab-ci.yml`](https://gitlab.com/npneq/inq/blob/master/.gitlab-ci.yml).
 
-## Reference
+## INQ papers
+
+These papers describe the implementation of INQ. Please cite the relevant ones when you publish work that uses INQ.
 
 - **INQ, a Modern GPU-Accelerated Computational Framework for (Time-Dependent) Density Functional Theory**.\
 Xavier Andrade, Chaitanya Das Pemmaraju, Alexey Kartsev, Jun Xiao, Aaron Lindenberg, Sangeeta Rajpurohit, Liang Z. Tan, Tadashi Ogitsu, and Alfredo A. Correa\
-[_J. Chem. Theory Comput._ 2021, 17, 12, 7447–7467](https://pubs.acs.org/doi/10.1021/acs.jctc.1c00562) (open access)
+[_J. Chem. Theory Comput._ 17, 7447–7467 (2021)](https://doi.org/10.1021/acs.jctc.1c00562) (open access)
+- **Spin non-collinear real-time time-dependent density-functional theory and implementation in the modern GPU-accelerated INQ code**.\
+Jacopo Simoni, Xavier Andrade, Wuzhang Fang, Andrew C. Grieder, Alfredo A. Correa, Tadashi Ogitsu, and Yuan Ping
+[_APL Comput. Phys._, 1, 026108 (2025)](https://doi.org/10.1063/5.0290737)
 
 ## Introductory material
 

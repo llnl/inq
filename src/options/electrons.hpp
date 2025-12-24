@@ -142,7 +142,7 @@ public:
 		utils::save_optional(comm, dirname + "/density_factor", density_factor_, error_message);
 		utils::save_optional(comm, dirname + "/spherical_grid", spherical_grid_, error_message);
 		utils::save_optional(comm, dirname + "/spin",           spin_,           error_message);
-		
+
 	}
 	
 	static auto load(std::string const & dirname) {
@@ -155,7 +155,7 @@ public:
 		utils::load_optional(dirname + "/double_grid", opts.double_grid_);
 		utils::load_optional(dirname + "/density_factor", opts.density_factor_);
 		utils::load_optional(dirname + "/spherical_grid", opts.spherical_grid_);
-		utils::load_optional(dirname + "/spin",           opts.spin_);		
+		utils::load_optional(dirname + "/spin",           opts.spin_);
 				
 		return opts;
 	}
@@ -185,6 +185,10 @@ public:
 		} else {
 			out << "NOT SET *";
 		}
+		out << "\n";
+
+		out << "  density-cutoff     = " << pow(self.density_factor_value(), 2) << "x";
+		if(not self.density_factor_.has_value()) out << " *";
 		out << "\n";
 		
 		out << "  spacing            = ";

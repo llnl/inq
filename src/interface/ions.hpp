@@ -12,6 +12,7 @@
 #include <input/environment.hpp>
 #include <interface/actions.hpp>
 #include <interface/cell.hpp>
+#include <interface/runtime_options.hpp>
 #include <systems/ions.hpp>
 
 namespace inq {
@@ -185,7 +186,7 @@ These are the uses for the command:
 	}
 	
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 
 		using utils::str_to;
 		
@@ -198,7 +199,7 @@ These are the uses for the command:
 
 			if(args.size() != 1) actions::error(input::environment::global().comm(), "The 'ions clear' command doesn't take arguments.");
 			clear();
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
@@ -212,7 +213,7 @@ These are the uses for the command:
 			auto zz = str_to<double>(args[5]);
 			
 			insert_fractional(symbol, {xx, yy, zz});
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
@@ -227,7 +228,7 @@ These are the uses for the command:
 			auto zz = magnitude::length::parse(str_to<double>(args[4]), units);
 			
 			insert(symbol, {xx, yy, zz});
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
@@ -236,13 +237,13 @@ These are the uses for the command:
 			if(args.size() != 2) actions::error(input::environment::global().comm(), "Wrong arguments for ions remove.\nUse: inq ions remove <index>");
 			
 			remove(str_to<long>(args[1]));
-			if(not quiet) operator()();
+			if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 		
 		if(args.size() == 2 and args[0] == "file"){
 			file(args[1]);
-			if(not quiet) {
+			if(not run_opts.quiet) {
 				interface::cell();
 				operator()();
 			}
@@ -253,7 +254,7 @@ These are the uses for the command:
 			auto radius = magnitude::length::parse(str_to<double>(args[3]), args[4]);
 			
 			file(args[1], radius);
-			if(not quiet) {
+			if(not run_opts.quiet) {
 				interface::cell();
 				operator()();
 			}

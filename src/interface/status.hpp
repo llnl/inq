@@ -59,7 +59,7 @@ Prints all the currently defined parameters and available results.
 	}
 	
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 
 		using utils::str_to;
 		

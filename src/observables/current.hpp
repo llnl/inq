@@ -25,6 +25,8 @@ namespace observables {
 template <typename HamiltonianType>
 basis::field<basis::real_space, vector3<double, covariant>> current_density(const systems::ions & ions, systems::electrons const & electrons, HamiltonianType const & ham){
 
+	CALI_CXX_MARK_FUNCTION;
+	
 	basis::field<basis::real_space, vector3<double, covariant>> cdensity(electrons.density_basis());
 	cdensity.fill(vector3<double, covariant>{0.0, 0.0, 0.0});
 
@@ -71,33 +73,40 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 	auto par = input::parallelization(comm);
 
-	{
+	SECTION("Gamma - no atoms") {
+			
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		systems::electrons electrons(par, ions, options::electrons{}.cutoff(15.0_Ha).extra_electrons(20.0));
+
+		CHECK(electrons.states_basis().sizes()[0] == 10);
+		CHECK(electrons.states_basis().sizes()[1] == 18);
+		CHECK(electrons.states_basis().sizes()[2] == 10);
+		
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("Gamma - no atoms"){
+		{
 
 			ham.uniform_vector_potential() = vector3<double, covariant>{0.0, 0.0, 0.0};
 			
 			auto cur = observables::current(ions, electrons, ham);
 
-			CHECK(cur[0] == 62.2452955214_a);
-			CHECK(cur[1] == -1.0723045428_a);
-			CHECK(cur[2] == 55.1882949624_a);
+			CHECK(cur[0] == 58.8773094314_a);
+			CHECK(cur[1] == 66.7377143753_a);
+			CHECK(cur[2] == 65.3287481459_a);
 			
 			ham.uniform_vector_potential() = vector3<double, covariant>{1.0, -2.0, 3.0};
 
 			cur = observables::current(ions, electrons, ham);
 
-			CHECK(cur[0] ==  42.2452955214_a);
-			CHECK(cur[1] ==  38.9276954572_a);
-			CHECK(cur[2] ==  -4.8117050376_a);
+			CHECK(cur[0] ==  38.8773094314_a);
+			CHECK(cur[1] == 106.7377143753_a);
+			CHECK(cur[2] ==   5.3287481459_a);
 			
 		}
 
-		SECTION("Gamma - no atoms - zero paramagnetic"){
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -125,33 +134,35 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 	}
 
-	{
+	SECTION("1/4 1/4 1/4 - no atoms") {
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		systems::electrons electrons(par, ions, options::electrons{}.cutoff(15.0_Ha).extra_electrons(20.0), input::kpoints::point(0.25, 0.25, 0.25));
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("1/4 1/4 1/4 - no atoms"){
+		{
 			
 			auto cur = observables::current(ions, electrons, ham);
 
 			ham.uniform_vector_potential() = vector3<double, covariant>{0.0, 0.0, 0.0};
 			
-			CHECK(cur[0] ==  30.8293689855_a);
-			CHECK(cur[1] == -32.4882310787_a);
-			CHECK(cur[2] ==  23.7723684265_a);
+			CHECK(cur[0] ==  27.4613828955_a);
+			CHECK(cur[1] ==  35.3217878394_a);
+			CHECK(cur[2] ==  33.91282161_a);
 			
 			ham.uniform_vector_potential() = vector3<double, covariant>{1.0, -2.0, 3.0};
 
 			cur = observables::current(ions, electrons, ham);
 
-			CHECK(cur[0] ==  10.8293689855_a);
-			CHECK(cur[1] ==   7.5117689213_a);
-			CHECK(cur[2] == -36.2276315735_a);
+			CHECK(cur[0] ==   7.4613828955_a);
+			CHECK(cur[1] ==  75.3217878394_a);
+			CHECK(cur[2] == -26.08717839_a);
 			
 		}
 
-		SECTION("1/4 1/4 1/4 - no atoms - zero paramagnetic"){
+
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -179,7 +190,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 	}
 
-	{
+	SECTION("Gamma - atoms") {
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		ions.insert("Cu", {0.0_b, 0.0_b, 0.0_b});
 		ions.insert("Ag", {2.0_b, 0.7_b, 0.0_b});	
@@ -187,27 +198,28 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("Gamma - atoms"){
+		{
 
 			ham.uniform_vector_potential() = vector3<double, covariant>{0.0, 0.0, 0.0};
 			
 			auto cur = observables::current(ions, electrons, ham);
 
-			CHECK(cur[0] == 125.0726107094_a);
-			CHECK(cur[1] ==  4.7292765308_a);
-			CHECK(cur[2] == 116.5420097097_a);
+			CHECK(cur[0] == 117.5971245633_a);
+			CHECK(cur[1] == 121.1321026989_a);
+			CHECK(cur[2] == 118.2973865593_a);
 			
 			ham.uniform_vector_potential() = vector3<double, covariant>{1.0, -2.0, 3.0};
 
 			cur = observables::current(ions, electrons, ham);
 
-			CHECK(cur[0] ==  87.0638041144_a);
-			CHECK(cur[1] ==  80.6922069845_a);
-			CHECK(cur[2] ==   2.5258837095_a);
+			CHECK(cur[0] ==  79.5823939128_a);
+			CHECK(cur[1] == 197.1665632014_a);
+			CHECK(cur[2] ==  4.2662015108_a);
 			
 		}
 
-		SECTION("Gamma - atoms - zero paramagnetic"){
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -230,7 +242,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 	}
 
-	{
+	SECTION("1/4 1/4 1/4 - atoms"){
 		systems::ions ions(systems::cell::orthorhombic(6.0_b, 10.0_b, 6.0_b));
 		ions.insert("Cu", {0.0_b, 0.0_b, 0.0_b});
 		ions.insert("Ag", {2.0_b, 0.7_b, 0.0_b});	
@@ -238,27 +250,28 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons);
 		hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
 		
-		SECTION("Gamma - atoms"){
+		{
 
 			ham.uniform_vector_potential() = vector3<double, covariant>{0.0, 0.0, 0.0};
 			
 			auto cur = observables::current(ions, electrons, ham);
 
-			CHECK(cur[0] ==  65.3579017395_a);
-			CHECK(cur[1] == -54.9266021369_a);
-			CHECK(cur[2] ==  56.8453806312_a);
+			CHECK(cur[0] ==  57.9099354262_a);
+			CHECK(cur[1] ==  61.428038832_a);
+			CHECK(cur[2] ==  58.5925299543_a);
 			
 			ham.uniform_vector_potential() = vector3<double, covariant>{1.0, -2.0, 3.0};
 
 			cur = observables::current(ions, electrons, ham);
 
-			CHECK(cur[0] ==  27.3599465174_a);
-			CHECK(cur[1] ==  21.0517395749_a);
-			CHECK(cur[2] == -57.1448517995_a);
+			CHECK(cur[0] ==  19.907317359_a);
+			CHECK(cur[1] == 137.4915041391_a);
+			CHECK(cur[2] == -55.4342077245_a);
 			
 		}
 
-		SECTION("Gamma - atoms - zero paramagnetic"){
+		//zero paramagnetic
+		{
 			
 			for(auto & phi : electrons.kpin()) phi.fill(1.0);
 			
@@ -280,7 +293,6 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			
 		}
 	}
-
 	
 }
 #endif

@@ -3,7 +3,7 @@
 #ifndef INQ__MAGNITUDE__LENGTH
 #define INQ__MAGNITUDE__LENGTH
 
-// Copyright (C) 2019-2023 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
+// Copyright (C) 2019-2025 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -17,19 +17,19 @@ namespace magnitude {
 
 struct length;
 
-auto operator "" _b(long double val){
+auto operator ""_b(long double val){
 	return inq::quantity<length>::from_atomic_units(val);
 }
 
-auto operator "" _bohr(long double val){
+auto operator ""_bohr(long double val){
 	return inq::quantity<length>::from_atomic_units(val);
 }
 
-auto operator "" _angstrom(long double val){
+auto operator ""_angstrom(long double val){
 	return inq::quantity<length>::from_atomic_units(1.88972612462938*val);
 }
 
-auto operator "" _A(long double val){
+auto operator ""_A(long double val){
 	return val*1.0_angstrom;
 }
 

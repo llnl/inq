@@ -14,16 +14,15 @@ inq ground-state mixing 0.1
 
 inq run ground-state
 
-inq util match `inq results ground-state energy total`           -2.355128752518 3e-5
-inq util match `inq results ground-state energy kinetic`          2.125707369840 3e-5
-inq util match `inq results ground-state energy eigenvalues`     -1.511390321649 3e-5
-inq util match `inq results ground-state energy hartree`          0.903321603071 3e-5
-inq util match `inq results ground-state energy external`        -3.319351558502 3e-5
-inq util match `inq results ground-state energy non-local`       -0.389801056728 3e-5
-inq util match `inq results ground-state energy xc`              -1.351311210649 3e-5
-inq util match `inq results ground-state energy nvxc`            -1.734588282400 3e-5
+inq util match `inq results ground-state energy total`           -2.356866852184 3e-5
+inq util match `inq results ground-state energy kinetic`          2.132039018586 3e-5
+inq util match `inq results ground-state energy eigenvalues`     -1.510974587511 3e-5
+inq util match `inq results ground-state energy hartree`          0.905608655081 3e-5
+inq util match `inq results ground-state energy external`        -3.325211379435 3e-5
+inq util match `inq results ground-state energy non-local`       -0.393268769855 3e-5
+inq util match `inq results ground-state energy xc`              -1.352340477011 3e-5
+inq util match `inq results ground-state energy nvxc`            -1.735750766969 3e-5
 inq util match `inq results ground-state energy exact-exchange`   0.000000000000 3e-5
 inq util match `inq results ground-state energy ion`             -0.323693899550 3e-5
 
 #TODO: check the eigenvalues to be -0.401182208666 and -0.354512952159
-

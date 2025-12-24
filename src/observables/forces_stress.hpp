@@ -20,8 +20,11 @@ namespace inq {
 namespace observables {
 
 struct forces_stress {
+
+	using stress_type = vector3<vector3<double>>;
+	
 	gpu::array<vector3<double>, 1> forces;
-	vector3<vector3<double>> stress;
+	stress_type stress;
 
 	forces_stress() = default;
 
@@ -61,7 +64,7 @@ private:
 	
 	template <typename Stress1D>
 	auto tensor(Stress1D const & stress1d) {
-		vector3<vector3<double>> stress;
+		stress_type stress;
 
 		for(auto index = 0; index < 6; index++) {
 			int alpha, beta;
@@ -76,17 +79,17 @@ private:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
 	template <typename GPhi, typename Occupations>
-	vector3<vector3<double>> stress_kinetic(GPhi const & gphi, Occupations const & occupations) {
+	stress_type stress_kinetic(GPhi const & gphi, Occupations const & occupations) {
 
 		auto stress1d = gpu::run(6, gpu::reduce(gphi.local_set_size()), gpu::reduce(gphi.basis().local_size()), 0.0,
-														 [metric = gphi.basis().cell().metric(), gph = begin(gphi.matrix()), occ = begin(occupations)] GPU_LAMBDA (auto index, auto ist, auto ip) {
+														 [cell = gphi.basis().cell(), gph = begin(gphi.matrix()), occ = begin(occupations)] GPU_LAMBDA (auto index, auto ist, auto ip) {
 															 int alpha, beta;
 															 stress_component(index, alpha, beta);
-															 auto grad_cart = metric.to_cartesian(gph[ip][ist]);
+															 auto grad_cart = cell.to_cartesian(gph[ip][ist]);
 															 return occ[ist]*real(conj(grad_cart[alpha])*grad_cart[beta]);
 														 });
 		
-		if(gphi.full_comm().size() > 1) gphi.full_comm().all_reduce_n(raw_pointer_cast(stress1d.data_elements()), 6);
+		if(gphi.full_comm().size() > 1) gphi.full_comm().all_reduce_in_place_n(raw_pointer_cast(stress1d.data_elements()), 6);
 
 		return -gphi.basis().volume_element()*tensor(stress1d);
 	}
@@ -94,20 +97,20 @@ private:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
 	template <typename Density>
-	vector3<vector3<double>> stress_electrostatic(Density const & density) {
+	stress_type stress_electrostatic(Density const & density) {
 
 		auto potential = solvers::poisson::solve(density);
 		auto efield = operations::gradient(potential);
 
 		auto stress1d = gpu::run(6, gpu::reduce(efield.basis().local_size()), 0.0,
-														 [metric = efield.basis().cell().metric(), ef = begin(efield.linear())] GPU_LAMBDA (auto index, auto ip) {
+														 [cell = efield.basis().cell(), ef = begin(efield.linear())] GPU_LAMBDA (auto index, auto ip) {
 															 int alpha, beta;
 															 stress_component(index, alpha, beta);
-															 auto ef_cart = metric.to_cartesian(ef[ip]);
+															 auto ef_cart = cell.to_cartesian(ef[ip]);
 															 return ef_cart[alpha]*ef_cart[beta];
 														 });
 
-		if(efield.basis().comm().size() > 1) efield.basis().comm().all_reduce_n(raw_pointer_cast(stress1d.data_elements()), 6);
+		if(efield.basis().comm().size() > 1) efield.basis().comm().all_reduce_in_place_n(raw_pointer_cast(stress1d.data_elements()), 6);
 
 		return density.basis().volume_element()/(4.0*M_PI)*tensor(stress1d);
 	}
@@ -123,25 +126,22 @@ private:
 		
 		CALI_CXX_MARK_FUNCTION;
 
-		// SET THE STRESS TO ZERO
-		for(auto alpha = 0; alpha < 3; alpha++){
-			for(auto beta = 0; beta < 3; beta++){
-				stress[alpha][beta] = 0.0;
-			}
-		}
+		stress = zero<stress_type>();
 		
 		basis::field<basis::real_space, vector3<double, covariant>> gdensity(electrons.density_basis());
 		gdensity.fill(vector3<double, covariant>{0.0, 0.0, 0.0});
 		
-		gpu::array<vector3<double>, 1> forces_non_local(ions.size(), {0.0, 0.0, 0.0});
-
+		gpu::array<vector3<double>, 1> forces_non_local(ions.size() + 3, {0.0, 0.0, 0.0}); //extra space to reduce the stress
+		stress_type stress_non_local = zero<stress_type>();
+		
 		auto iphi = 0;
 		for(auto & phi : electrons.kpin()){
 			
 			auto gphi = operations::gradient(phi, /* factor = */ 1.0, /*shift = */ phi.kpoint() + ham.uniform_vector_potential());
 			observables::density::calculate_gradient_add(electrons.occupations()[iphi], phi, gphi, gdensity);
-			
-			ham.projectors_all().force(phi, gphi, electrons.occupations()[iphi], phi.kpoint() + ham.uniform_vector_potential(), forces_non_local);
+
+			ham.projectors_all().force_stress(phi, gphi, electrons.occupations()[iphi], phi.kpoint() + ham.uniform_vector_potential(), forces_non_local, stress_non_local);
+
 			for(auto & pr : ham.projectors_rel()) pr.force(phi, gphi, electrons.occupations()[iphi], phi.kpoint() + ham.uniform_vector_potential(), forces_non_local);
 
 			stress += stress_kinetic(gphi, electrons.occupations()[iphi]);
@@ -153,8 +153,20 @@ private:
 		
 		if(electrons.full_comm().size() > 1){
 			CALI_CXX_MARK_SCOPE("forces_nonlocal::reduce");
-			electrons.full_comm().all_reduce_n(raw_pointer_cast(forces_non_local.data_elements()), forces_non_local.size(), std::plus<>{});
+			forces_non_local[ions.size() + 0] = stress_non_local[0];
+			forces_non_local[ions.size() + 1] = stress_non_local[1];
+			forces_non_local[ions.size() + 2] = stress_non_local[2];
+
+			electrons.full_comm().all_reduce_in_place_n(raw_pointer_cast(forces_non_local.data_elements()), forces_non_local.size(), std::plus<>{});
+
+			stress_non_local[0] = forces_non_local[ions.size() + 0];
+			stress_non_local[1] = forces_non_local[ions.size() + 1];
+			stress_non_local[2] = forces_non_local[ions.size() + 2];
 		}
+
+		for(auto alpha = 0; alpha < 3; alpha++) stress_non_local[alpha][alpha] -= energy.non_local();
+
+		stress += stress_non_local;
 		
 		auto ionic_forces = ionic::interaction_forces(ions.cell(), ions, electrons.atomic_pot());
 		
@@ -172,12 +184,12 @@ private:
 																		 return (v1[ip] + v2[ip])*gdensityp[ip];
 																	 });
 
-				forces_local[iatom] = electrons.density_basis().volume_element()*ions.cell().metric().to_cartesian(force_cov);
+				forces_local[iatom] = electrons.density_basis().volume_element()*ions.cell().to_cartesian(force_cov);
 			}
 			
 			if(electrons.density_basis().comm().size() > 1){
 				CALI_CXX_MARK_SCOPE("forces_local::reduce");
-				electrons.density_basis().comm().all_reduce_n(reinterpret_cast<double *>(raw_pointer_cast(forces_local.data_elements())), 3*forces_local.size());
+				electrons.density_basis().comm().all_reduce_in_place_n(reinterpret_cast<double *>(raw_pointer_cast(forces_local.data_elements())), 3*forces_local.size());
 			}
 		}
 

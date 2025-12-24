@@ -68,13 +68,13 @@ int main(int argc, char ** argv){
 		auto result_pol_z = ground_state::calculate(ions, electrons, options::theory{}.lda(), scf_options, perturbations::simple_electric_field{{0.0, 0.0, amp}});
 
 		match.check("total energy",        result_pol_z.energy.total(),             -22.424609857701);
-		match.check("kinetic energy",      result_pol_z.energy.kinetic(),            14.382152227317);
-		match.check("eigenvalues",         result_pol_z.energy.eigenvalues(),        -5.885829458367);
-		match.check("Hartree energy",      result_pol_z.energy.hartree(),            28.446375589623);
-		match.check("external energy",     result_pol_z.energy.external(),          -67.927947497969);
-		match.check("non-local energy",    result_pol_z.energy.non_local(),          -2.608348129872);
-		match.check("XC energy",           result_pol_z.energy.xc(),                 -5.956004048259);
-		match.check("XC density integral", result_pol_z.energy.nvxc(),               -6.624437237089);
+		match.check("kinetic energy",      result_pol_z.energy.kinetic(),            14.384278182234);
+		match.check("eigenvalues",         result_pol_z.energy.eigenvalues(),        -5.885829308879);
+		match.check("Hartree energy",      result_pol_z.energy.hartree(),            28.446375748301);
+		match.check("external energy",     result_pol_z.energy.external(),          -67.930073499256);
+		match.check("non-local energy",    result_pol_z.energy.non_local(),          -2.608348211361);
+		match.check("XC energy",           result_pol_z.energy.xc(),                 -5.956004079078);
+		match.check("XC density integral", result_pol_z.energy.nvxc(),               -6.624437277099);
 		match.check("HF exchange energy",  result_pol_z.energy.exact_exchange(),      0.000000000000);
 		match.check("ion-ion energy",      result_pol_z.energy.ion(),                11.239162001458);
 
@@ -95,3 +95,4 @@ int main(int argc, char ** argv){
 	return match.fail();
 
 }
+

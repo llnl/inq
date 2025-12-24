@@ -16,6 +16,7 @@
 #include <basis/field.hpp>
 #include <basis/field_set.hpp>
 #include <basis/fourier_space.hpp>
+#include <parallel/transpose.hpp>
 #include <states/orbital_set.hpp>
 
 #ifdef ENABLE_GPU
@@ -52,6 +53,13 @@ template <class InArray4D, class OutArray4D>
 void to_fourier_array(basis::real_space const & real_basis, basis::fourier_space const & fourier_basis, InArray4D const & array_rs, OutArray4D && array_fs) {
 
 	CALI_CXX_MARK_FUNCTION;
+	assert(get<0>(sizes(array_rs)) == real_basis.local_sizes()[0]);
+	assert(get<1>(sizes(array_rs)) == real_basis.local_sizes()[1]);
+	assert(get<2>(sizes(array_rs)) == real_basis.local_sizes()[2]);
+
+	assert(get<0>(sizes(array_fs)) == fourier_basis.local_sizes()[0]);
+	assert(get<1>(sizes(array_fs)) == fourier_basis.local_sizes()[1]);
+	assert(get<2>(sizes(array_fs)) == fourier_basis.local_sizes()[2]);
 
 	assert(get<3>(sizes(array_rs)) == get<3>(sizes(array_fs)));
 	
@@ -65,62 +73,38 @@ void to_fourier_array(basis::real_space const & real_basis, basis::fourier_space
 	if(not real_basis.part().parallel()) {
 		CALI_CXX_MARK_SCOPE("fft_forward_3d");
 
+		assert(not fourier_basis.reverse_order());
+		assert(extensions(array_rs) == extensions(array_fs));
+		
 		fft::dft_forward({true, true, true, false}, array_rs, array_fs);
 		gpu::sync();
 
 	} else {
 
-		auto & comm = real_basis.comm();
+		assert(fourier_basis.reverse_order());
 		
-		int xblock = real_basis.cubic_part(0).max_local_size();
-		int zblock = fourier_basis.cubic_part(2).max_local_size();
-		assert(real_basis.local_sizes()[1] == fourier_basis.local_sizes()[1]);
-
-		auto last_dim = get<3>(sizes(array_rs));
-
-		gpu::array<complex, 4> tmp({xblock, real_basis.local_sizes()[1], zblock*comm.size(), last_dim});
-		
-		gpu::prefetch(tmp);
-		
-		{
-			CALI_CXX_MARK_SCOPE("fft_forward_2d");
-
-			auto const real_x = real_basis.local_sizes();
-			fft::dft_forward({false, true, true, false}, array_rs, tmp({0, real_x[0]}, {0, real_x[1]}, {0, real_x[2]}));
-			gpu::sync();
-		}
-		
-		CALI_MARK_BEGIN("fft_forward_transpose");   
-		gpu::array<complex, 5> buffer({comm.size(), xblock, real_basis.local_sizes()[1], zblock, last_dim});
-
-		for(int i4 = 0; i4 < comm.size(); i4++){
-			gpu::run(last_dim, zblock, real_basis.local_sizes()[1], xblock, 
-							 [i4,
-								buf = begin(buffer),
-								rot = begin(tmp.unrotated().unrotated().partitioned(comm.size()).transposed().rotated().transposed().rotated())]
-							 GPU_LAMBDA (auto i0, auto i1, auto i2, auto i3){
-								 buf[i4][i3][i2][i1][i0] = rot[i4][i3][i2][i1][i0];
-							 });
-		}
-		CALI_MARK_END("fft_forward_transpose");
-
-		assert(get<4>(sizes(buffer)) == last_dim);
-		
-		tmp.clear();
-
-		{
-			CALI_CXX_MARK_SCOPE("fft_forward_alltoall");
-			parallel::alltoall(buffer, comm);
-		}
+		gpu::array<complex, 4> tmp(extensions(array_rs));
 
 		{
 			CALI_CXX_MARK_SCOPE("fft_forward_1d");
-			
-			auto const fourier_x = fourier_basis.local_sizes();
-			fft::dft_forward({true, false, false, false}, buffer.flatted()({0, fourier_x[0]}, {0, fourier_x[1]}, {0, fourier_x[2]}), array_fs);
+			fft::dft_forward({true, false, false, false}, array_rs, tmp);
 			gpu::sync();
 		}
 
+		parallel::transpose_forward(real_basis.comm(), fourier_basis.cubic_part(2), real_basis.cubic_part(1), tmp);
+
+		assert(get<0>(sizes(tmp)) == fourier_basis.local_sizes()[0]);
+		assert(get<1>(sizes(tmp)) == fourier_basis.local_sizes()[1]);
+		assert(get<2>(sizes(tmp)) == fourier_basis.local_sizes()[2]);
+		assert(get<3>(sizes(array_rs)) == get<3>(sizes(tmp)));
+	
+		{
+			CALI_CXX_MARK_SCOPE("fft_forward_1d");
+			
+			fft::dft_forward({true, true, false, false}, tmp, array_fs);
+			gpu::sync();
+		}
+		
 	}
 }
 
@@ -137,69 +121,55 @@ void to_real_array(basis::fourier_space const & fourier_basis, basis::real_space
 #else
 	namespace fft = multi::fftw;
 #endif
+	
+	assert(get<0>(sizes(array_rs)) == real_basis.local_sizes()[0]);
+	assert(get<1>(sizes(array_rs)) == real_basis.local_sizes()[1]);
+	assert(get<2>(sizes(array_rs)) == real_basis.local_sizes()[2]);
 
+	assert(get<0>(sizes(array_fs)) == fourier_basis.local_sizes()[0]);
+	assert(get<1>(sizes(array_fs)) == fourier_basis.local_sizes()[1]);
+	assert(get<2>(sizes(array_fs)) == fourier_basis.local_sizes()[2]);
+
+	assert(get<3>(sizes(array_rs)) == get<3>(sizes(array_fs)));
+	
 	if(not real_basis.part().parallel()) {
 		CALI_CXX_MARK_SCOPE("fft_backward_3d");
 
+		assert(not fourier_basis.reverse_order());
+		
+		assert(extensions(array_rs) == extensions(array_fs));
 		fft::dft_backward({true, true, true, false}, array_fs, array_rs);
 		gpu::sync();
 
 	} else {
 
-		auto & comm = fourier_basis.comm();
-
-		int xblock = real_basis.cubic_part(0).max_local_size();
-		int zblock = fourier_basis.cubic_part(2).max_local_size();
-
-		auto last_dim = get<3>(sizes(array_fs));
+		assert(fourier_basis.reverse_order());
 		
-		gpu::array<complex, 5> buffer({comm.size(), xblock, real_basis.local_sizes()[1], zblock, last_dim});
-		gpu::prefetch(buffer);
+		auto & partx = fourier_basis.cubic_part(2);
+		auto & party = real_basis.cubic_part(1);
+
+		gpu::array<complex, 4> tmp2(extensions(array_fs));
 		
 		{
 			CALI_CXX_MARK_SCOPE("fft_backward_2d");
 			
-			fft::dft_backward({true, true, false, false}, array_fs, buffer.flatted()({0, fourier_basis.local_sizes()[0]}, {0, fourier_basis.local_sizes()[1]}, {0, fourier_basis.local_sizes()[2]}));
+			fft::dft_backward({true, true, false, false}, array_fs, tmp2);
 			gpu::sync();
 		}
 
-		{
-			CALI_CXX_MARK_SCOPE("fft_backward_alltoall");
-			parallel::alltoall(buffer, comm);
-		}
-		
-		gpu::array<complex, 4> tmp({real_basis.local_sizes()[0], real_basis.local_sizes()[1], zblock*comm.size(), last_dim});
-		gpu::prefetch(tmp);
-		
-		{
-			CALI_CXX_MARK_SCOPE("fft_backward_transpose");
-			for(int i4 = 0; i4 < comm.size(); i4++){
-				gpu::run(last_dim, zblock, real_basis.local_sizes()[1], real_basis.local_sizes()[0],
-								 [i4, 
-									buf = begin(buffer),
-									rot = begin(tmp.unrotated().unrotated().partitioned(comm.size()).transposed().rotated().transposed().rotated())]
-								 GPU_LAMBDA (auto i0, auto i1, auto i2, auto i3){
-									 rot[i4][i3][i2][i1][i0] = buf[i4][i3][i2][i1][i0];
-								 });
-			}
-		}
+		parallel::transpose_backward(fourier_basis.comm(), partx, party, tmp2);
 
+		assert(get<0>(sizes(tmp2)) == real_basis.cubic_part(0).local_size());
+		assert(get<1>(sizes(tmp2)) == real_basis.cubic_part(1).local_size());
+		assert(get<2>(sizes(tmp2)) == real_basis.cubic_part(2).local_size());
+		
 		{
 			CALI_CXX_MARK_SCOPE("fft_backward_1d");
 
-			auto tmpsub = tmp({0, real_basis.local_sizes()[0]}, {0, real_basis.local_sizes()[1]}, {0, real_basis.local_sizes()[2]});
-
-#ifdef ENABLE_GPU
-			//when using cuda, do a loop explicitly over the last dimension (n1), otherwise multi makes a loop over the 2 first ones (n0 and n1). And we know that n3 << n0*n1.
-			for(auto ii : extension(tmpsub.unrotated())) {
-				fft::dft_backward({false, false, true}, tmpsub.unrotated()[ii], array_rs.unrotated()[ii]);
-			}
-#else
-			fft::dft_backward({false, false, true, false}, tmpsub, array_rs);
-#endif
+			fft::dft_backward({true, false, false, false}, tmp2, array_rs);
 			gpu::sync();
-
 		}
+
 	}
 
 	if(normalize){
@@ -297,76 +267,31 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	using namespace Catch::literals;
 	
 	parallel::cartesian_communicator<2> cart_comm(boost::mpi3::environment::get_world_instance(), {});
-
 	auto basis_comm = basis::basis_subcomm(cart_comm);
-	basis::real_space rs(systems::cell::cubic(6.66_b), /*spacing =*/ 0.46320257, basis_comm);
-	auto fs = basis::fourier_space(rs);
-	
-	basis::field_set<basis::real_space, complex> phi(rs, 7, cart_comm);
 
+	
 	SECTION("zero_outside_sphere"){
-		
+
+		basis::real_space rs(systems::cell::cubic(16.66_b), /*spacing =*/ 0.306320257, basis_comm);
+		auto fs = basis::fourier_space(rs);
 		basis::field<basis::fourier_space, double> ff(fs);
-		
+
 		ff.fill(1.0);
 		auto vol = operations::integral(ff);
-
-		CHECK(vol == 0.1076560845_a);
 		
+		CHECK(vol == 0.0293659268_a);
+	
 		operations::transform::zero_outside_sphere(ff);
 		
-		CHECK(operations::integral(ff)/vol == 0.5160349854_a /* The limit is M_PI/6.0 for zero spacing */);
-	}
-	
-	SECTION("Zero"){
-		
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.set_part().local_size(); ist++) phi.hypercubic()[ix][iy][iz][ist] = 0.0;
-				}
-			}
-		}
-		
-		auto fphi = operations::transform::to_fourier(phi);
-		
-		double diff = 0.0;
-		for(int ix = 0; ix < fphi.basis().local_sizes()[0]; ix++){
-			for(int iy = 0; iy < fphi.basis().local_sizes()[1]; iy++){
-				for(int iz = 0; iz < fphi.basis().local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.set_part().local_size(); ist++){
-						diff += fabs(fphi.hypercubic()[ix][iy][iz][ist]);
-					}
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		
-		diff /= fphi.hypercubic().num_elements();
-
-		CHECK(diff < 1e-15);
-		
-		auto phi2 = operations::transform::to_real(fphi);
-
-		diff = 0.0;
-		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
-			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
-				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
-					for(int ist = 0; ist < phi.set_part().local_size(); ist++)  diff += fabs(phi.hypercubic()[ix][iy][iz][ist]);
-				}
-			}
-		}
-
-		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
-		
-		diff /= phi2.hypercubic().num_elements();
-
-		CHECK(diff < 1e-15);
-		
+		CHECK(operations::integral(ff)/vol == 0.5240308896_a /* The limit is M_PI/6.0 for zero spacing */);
 	}
 	
 	SECTION("Gaussian"){
+
+		basis::real_space rs(systems::cell::cubic(16.66_b), /*spacing =*/ 0.306320257, basis_comm);
+		auto fs = basis::fourier_space(rs);
+		
+		basis::field_set<basis::real_space, complex> phi(rs, 7, cart_comm);
 		
 		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
 			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
@@ -381,15 +306,18 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 		
 		auto fphi = operations::transform::to_fourier(phi);
+
+		auto fs_vol = fs.size()*fs.volume_element();
+		CHECK(fs_vol == 0.0293659268_a);
 		
 		double diff = 0.0;
-		for(int ix = 0; ix < fphi.basis().local_sizes()[0]; ix++){
-			for(int iy = 0; iy < fphi.basis().local_sizes()[1]; iy++){
-				for(int iz = 0; iz < fphi.basis().local_sizes()[2]; iz++){
-					double g2 = fphi.basis().point_op().g2(ix, iy, iz);
+		for(int i0 = 0; i0 < fphi.basis().local_sizes()[0]; i0++){
+			for(int i1 = 0; i1 < fphi.basis().local_sizes()[1]; i1++){
+				for(int i2 = 0; i2 < fphi.basis().local_sizes()[2]; i2++){
+					double g2 = fphi.basis().point_op().g2(i0, i1, i2);
 					for(int ist = 0; ist < phi.set_part().local_size(); ist++){
 						double sigma = 0.5*(ist + 1);
-						diff += fabs(fphi.hypercubic()[ix][iy][iz][ist] - pow(M_PI/sigma, 3.0/2.0)*exp(-0.25*g2/sigma));
+						diff += fabs(fphi.hypercubic()[i0][i1][i2][ist] - pow(M_PI/sigma, 3.0/2.0)/fs_vol*exp(-0.25*g2/sigma));
 					}
 				}
 			}
@@ -397,10 +325,73 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
 		
-		diff /= fphi.hypercubic().num_elements();
+		diff /= fs.size();
+		CHECK(diff < 1e-3);
 
-		//not sure what is wrong here
-		std::cout << "DIFF1 " << diff << std::endl;
+		auto phi2 = operations::transform::to_real(fphi);
+
+		diff = 0.0;
+		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
+			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
+				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
+					for(int ist = 0; ist < phi.set_part().local_size(); ist++){
+						diff += fabs(phi.hypercubic()[ix][iy][iz][ist] - phi2.hypercubic()[ix][iy][iz][ist]);
+					}
+				}
+			}
+		}
+		
+		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});   
+
+		diff /= phi2.hypercubic().num_elements();
+		
+		CHECK(diff < 1e-15);
+		
+	}
+
+	SECTION("Gaussian rotated"){
+
+		auto aa = 16.66_b;
+			
+		basis::real_space rs(systems::cell::lattice({aa/sqrt(2.0), aa/2, aa/2}, {-aa/sqrt(2), aa/2, aa/2}, {0.0_b, -aa/sqrt(2.0), aa/sqrt(2.0)}), /*spacing =*/ 0.306320257, basis_comm);
+		auto fs = basis::fourier_space(rs);
+		
+		basis::field_set<basis::real_space, complex> phi(rs, 7, cart_comm);
+		
+		for(int ix = 0; ix < rs.local_sizes()[0]; ix++){
+			for(int iy = 0; iy < rs.local_sizes()[1]; iy++){
+				for(int iz = 0; iz < rs.local_sizes()[2]; iz++){
+					double r2 = rs.point_op().r2(ix, iy, iz);
+					for(int ist = 0; ist < phi.set_part().local_size(); ist++){
+						double sigma = 0.5*(ist + 1);
+						phi.hypercubic()[ix][iy][iz][ist] = exp(-sigma*r2);
+					}
+				}
+			}
+		}
+		
+		auto fphi = operations::transform::to_fourier(phi);
+
+		auto fs_vol = fs.size()*fs.volume_element();
+		CHECK(fs_vol == 0.0293659268_a);
+		
+		double diff = 0.0;
+		for(int i0 = 0; i0 < fphi.basis().local_sizes()[0]; i0++){
+			for(int i1 = 0; i1 < fphi.basis().local_sizes()[1]; i1++){
+				for(int i2 = 0; i2 < fphi.basis().local_sizes()[2]; i2++){
+					double g2 = fphi.basis().point_op().g2(i0, i1, i2);
+					for(int ist = 0; ist < phi.set_part().local_size(); ist++){
+						double sigma = 0.5*(ist + 1);
+						diff += fabs(fphi.hypercubic()[i0][i1][i2][ist] - pow(M_PI/sigma, 3.0/2.0)/fs_vol*exp(-0.25*g2/sigma));
+					}
+				}
+			}
+		}
+
+		cart_comm.all_reduce_in_place_n(&diff, 1, std::plus<>{});
+		
+		diff /= fs.size();
+		CHECK(diff < 1e-3);
 
 		auto phi2 = operations::transform::to_real(fphi);
 

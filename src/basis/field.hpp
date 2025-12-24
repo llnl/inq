@@ -25,20 +25,27 @@
 namespace inq {
 namespace basis {
 	
-	template<class Basis, typename Type>
-	class field {
-
-	public:
-
-		using element_type = Type;
-		using basis_type = Basis;
-		using internal_array_type = gpu::array<element_type, 1>;
-
+template<class Basis, typename Type>
+class field {
+	
+public:
+	
+	using element_type = Type;
+	using basis_type = Basis;
+	using internal_array_type = gpu::array<element_type, 1>;
+	
+private:
+	
+	internal_array_type linear_;
+	basis_type basis_;
+	
+public:
+	
 		template <typename BType, typename EType>
 		using template_type = field<BType, EType>;
 		
 		field(const basis_type & basis):
-			linear_(basis.part().local_size()),
+			linear_(basis.part().max_local_size()),
 			basis_(basis){
 			prefetch();
 		}
@@ -74,7 +81,7 @@ namespace basis {
 			
 			gpu::array<int, 1> rem_points(basis().local_size());
 			for(long ip = 0; ip < basis().local_size(); ip++) rem_points[ip] = basis().part().local_to_global(ip).value();
-			linear_ = parallel::get_remote_points(old, rem_points);
+			linear() = parallel::get_remote_points(old, rem_points);
 		}
 		
 		explicit field(const field & coeff) = default;      //avoid unadverted copies
@@ -82,13 +89,15 @@ namespace basis {
 		field & operator=(const field & coeff) = default;
 		field & operator=(field && coeff) = default;
 		
-		template <typename ScalarType>
-		void fill(ScalarType const & scalar) {
-			CALI_CXX_MARK_SCOPE("fill(field_set)");
-			
-			linear_.fill(scalar);
-		}
-
+	template <typename ScalarType>
+	void fill(ScalarType const & scalar) {
+		CALI_CXX_MARK_SCOPE("fill(field_set)");
+		
+		gpu::run(basis_.local_size(), [lin = begin(linear_), scalar] GPU_LAMBDA (auto ip) {
+			lin[ip] = scalar;
+		});
+	}
+	
 		template<typename OtherType>
 		field& operator=(field<basis_type, OtherType> const& o){
 			static_assert( std::is_assignable<element_type&, OtherType>{}, "!" );
@@ -97,6 +106,23 @@ namespace basis {
 			return *this;
 		}
 
+	void shift_domains() {
+		if(basis_.comm().size() == 1) return;
+
+		auto next_proc = (basis_.comm().rank() + 1)%basis_.comm().size();
+		auto prev_proc = basis_.comm().rank() - 1;
+		if(prev_proc == -1) prev_proc = basis_.comm().size() - 1;
+
+		auto tag = basis_.part().rank() - basis_.comm().rank();
+		if(tag < 0) tag += basis_.comm().size();
+		assert(tag >= 0 and tag < basis_.comm().size());
+		
+		auto mpi_type = boost::mpi3::detail::basic_datatype<Type>();
+		assert(linear_.num_elements() == basis_.part().max_local_size());
+		MPI_Sendrecv_replace(data(), basis_.part().max_local_size(), mpi_type, prev_proc, tag, next_proc, tag, basis_.comm().get(), MPI_STATUS_IGNORE);
+		basis_.shift();
+	}
+	
 		auto size() const {
 			return basis_.size();
 		}
@@ -105,16 +131,16 @@ namespace basis {
 			return basis_;
 		}
 
-		auto cubic() const {
-			assert(basis_.local_size() > 0);
-			return linear_.partitioned(basis_.cubic_part(1).local_size()*basis_.cubic_part(0).local_size()).partitioned(basis_.cubic_part(0).local_size());
-		}
-
-		auto cubic() {
-			assert(basis_.local_size() > 0);
-			return linear_.partitioned(basis_.cubic_part(1).local_size()*basis_.cubic_part(0).local_size()).partitioned(basis_.cubic_part(0).local_size());
-		}
-		
+	auto cubic() const {
+		assert(basis_.local_size() > 0);
+		return linear().partitioned(basis_.cubic_part(1).local_size()*basis_.cubic_part(0).local_size()).partitioned(basis_.cubic_part(0).local_size());
+	}
+	
+	auto cubic() {
+		assert(basis().local_size() > 0);
+		return linear().partitioned(basis_.cubic_part(1).local_size()*basis_.cubic_part(0).local_size()).partitioned(basis_.cubic_part(0).local_size());
+	}
+	
 		auto data() {
 			return raw_pointer_cast(linear_.data_elements());
 		}
@@ -122,15 +148,15 @@ namespace basis {
 		auto data() const {
 			return raw_pointer_cast(linear_.data_elements());
 		}
-
-		auto & linear() const {
-			return linear_;
-		}
-
-		auto & linear() {
-			return linear_;
-		}
-
+	
+	auto linear() const {
+		return linear_({0, basis_.local_size()});
+	}
+	
+	auto linear() {
+		return linear_({0, basis_.local_size()});
+	}
+	
 		// emulate a field_set
 
 		auto hypercubic() const {
@@ -182,19 +208,14 @@ namespace basis {
 		template <typename CommunicatorType, typename OpType = std::plus<>>
 		void all_reduce(CommunicatorType & comm, OpType op = OpType{}){
 			if(comm.size() < 2) return;
-			comm.all_reduce_in_place_n(raw_pointer_cast(linear().data_elements()), linear().num_elements(), op);
+			comm.all_reduce_in_place_n(data(), linear().num_elements(), op);
 		}
 
-	private:
-		internal_array_type linear_;
-		basis_type basis_;
-
-	};
-
+};
 
 field<basis::real_space, complex> complex_field(field<basis::real_space, double> const & rfield) {
 	field<basis::real_space, complex> cfield(rfield.skeleton());        
-
+	
 	gpu::run(rfield.basis().part().local_size(),
 					 [cp = begin(cfield.linear()), rp = begin(rfield.linear())] GPU_LAMBDA (auto ip){
 						 cp[ip] = inq::complex(rp[ip], 0.0);
@@ -217,7 +238,10 @@ field<basis::real_space, vector3<inq::complex, VectorSpace>> complex_field(field
 
 field<basis::real_space, double> real_field(field<basis::real_space, complex> const & cfield) {
 	field<basis::real_space, double> rfield(cfield.skeleton());     
-	rfield.linear() = boost::multi::blas::real(cfield.linear());
+	gpu::run(rfield.basis().local_size(),
+					 [rf = begin(rfield.linear()), cf = begin(cfield.linear())] GPU_LAMBDA (auto ip) {
+						 rf[ip] = real(cf[ip]);
+					 });
 	return rfield;
 }
 
@@ -253,7 +277,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 
-	basis::real_space rs(systems::cell::orthorhombic(10.0_b, 4.0_b, 7.0_b), /*spacing = */ 0.35124074, comm);
+	basis::real_space rs(systems::cell::orthorhombic(4.0_b, 10.0_b, 7.0_b), /*spacing = */ 0.35124074, comm);
 
 	basis::field<basis::real_space, double> ff(rs);
 
@@ -262,17 +286,20 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	ff2.fill(0.0);
 
-	CHECK(( sizes(rs) == decltype(sizes(rs)){28, 11, 20} ));
+	CHECK(( sizes(rs) == decltype(sizes(rs)){12, 28, 20} ));
 
-	if(comm.size() == 1) CHECK(get<0>(sizes(ff.linear())) == 6160);
-	if(comm.size() == 2) CHECK(get<0>(sizes(ff.linear())) == 3080);
-	if(comm.size() == 4) CHECK(get<0>(sizes(ff.linear())) == 1540);
+	CHECK(get<0>(sizes(ff.cubic())) == 12);
+	
+	if(comm.size() == 1) CHECK(ff.linear().size() == 6720);
+	if(comm.size() == 2) CHECK(ff.linear().size() == 6720/2);
+	if(comm.size() == 3 and comm.rank() != 2) CHECK(ff.linear().size() == 2400);
+	if(comm.size() == 3 and comm.rank() == 2) CHECK(ff.linear().size() == 1920);
+	if(comm.size() == 4) CHECK(ff.linear().size() == 1680);
 
-	if(comm.size() == 1) CHECK(get<0>(sizes(ff.cubic())) == 28);
-	if(comm.size() == 2) CHECK(get<0>(sizes(ff.cubic())) == 14);
-	if(comm.size() == 4) CHECK(get<0>(sizes(ff.cubic())) == 7);
+	if(comm.size() == 1) CHECK(get<1>(sizes(ff.cubic())) == 28);
+	if(comm.size() == 2) CHECK(get<1>(sizes(ff.cubic())) == 14);
+	if(comm.size() == 4) CHECK(get<1>(sizes(ff.cubic())) == 7);
 
-	CHECK(get<1>(sizes(ff.cubic())) == 11);
 	CHECK(get<2>(sizes(ff.cubic())) == 20);
 
 	ff.fill(12.2244);
@@ -281,24 +308,24 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 
 	basis::field<basis::real_space, double> ff_copy(ff.skeleton());
 
-	CHECK(get<1>(sizes(ff_copy.cubic())) == 11);
+	CHECK(get<0>(sizes(ff_copy.cubic())) == 12);
 	CHECK(get<2>(sizes(ff_copy.cubic())) == 20);
 
 	auto zff = complex_field(ff);
 	
 	static_assert(std::is_same<decltype(zff), basis::field<basis::real_space, complex>>::value, "complex() should return a complex field");
 	
-	CHECK(get<1>(sizes(zff.cubic())) == 11);
+	CHECK(get<0>(sizes(zff.cubic())) == 12);
 	CHECK(get<2>(sizes(zff.cubic())) == 20);
 
 	auto dff = real_field(zff);
 
 	static_assert(std::is_same<decltype(dff), basis::field<basis::real_space, double>>::value, "real() should return a double field");
 
-	CHECK(get<1>(sizes(dff.cubic())) == 11);
+	CHECK(get<0>(sizes(dff.cubic())) == 12);
 	CHECK(get<2>(sizes(dff.cubic())) == 20);
 
-	CHECK(get<1>(sizes(ff.hypercubic())) == 11);
+	CHECK(get<0>(sizes(ff.hypercubic())) == 12);
 	CHECK(get<2>(sizes(ff.hypercubic())) == 20);
 	CHECK(get<3>(sizes(ff.hypercubic())) == 1);    
 
@@ -324,6 +351,32 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	for(int ii = 0; ii < red.basis().part().local_size(); ii++){
 		CHECK(red.linear()[ii] == 1.0_a);
 	}
-	
+
+	SECTION("Shift") {
+		basis::field<basis::real_space, complex> fie(rs, comm);
+
+		for(auto ip = 0; ip < fie.basis().local_size(); ip++){
+			fie.linear()[ip] = complex{double(fie.basis().part().start() + ip), double(comm.rank())};
+		}
+
+		auto part = fie.basis().part();
+
+		for(int ishift = 0; ishift < 2*comm.size(); ishift++) {
+			auto shift_rank = (comm.rank() + ishift)%comm.size();
+
+			CHECK(fie.basis().part().rank() == shift_rank);
+			CHECK(fie.basis().part().start() == part.start(shift_rank));
+			CHECK(fie.basis().part().local_size() == part.local_size(shift_rank));
+			
+			for(auto ip = 0; ip < fie.basis().local_size(); ip++){
+				CHECK(real(fie.linear()[ip]) == fie.basis().part().start() + ip);
+				CHECK(imag(fie.linear()[ip]) == shift_rank);
+			}
+			
+			fie.shift_domains();
+		}
+		
+		
+	}
 }
 #endif

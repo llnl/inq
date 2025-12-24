@@ -282,7 +282,7 @@ private:
 public:
 	
 	template <typename ArgsType>
-	void command(ArgsType args, bool quiet) const {
+	void command(ArgsType args, runtime_options const & run_opts) const {
 
 		if(args.size() == 0){
 			operator()();

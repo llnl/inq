@@ -90,7 +90,7 @@ public:
 	}
 
 	auto uniform_vector_potential() const{
-		return ions_.cell().metric().to_cartesian(ham_.uniform_vector_potential());
+		return ions_.cell().to_cartesian(ham_.uniform_vector_potential());
 	}
 
 	auto num_electrons() const {
@@ -106,7 +106,7 @@ public:
 	}
 
   auto current() const {
-    return ions_.cell().metric().to_cartesian(observables::current(ions_, electrons_, ham_));
+    return ions_.cell().to_cartesian(observables::current(ions_, electrons_, ham_));
   }
 	auto projected_occupation(const systems::electrons & gs) {
 		auto calc = [] (auto occ, auto v) {
@@ -125,7 +125,7 @@ public:
 		}
 
 		if(electrons_.kpin_states_comm().size() > 1){
-			electrons_.kpin_states_comm().all_reduce_n(raw_pointer_cast(occ.data_elements()), occ.num_elements(), std::plus<>{});
+			electrons_.kpin_states_comm().all_reduce_in_place_n(raw_pointer_cast(occ.data_elements()), occ.num_elements(), std::plus<>{});
 		}
 
 		return occ;

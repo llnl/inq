@@ -20,10 +20,10 @@ namespace x3 = boost::spirit::x3;
 
 namespace parsing {
 
-x3::rule<struct _expr, double> expr("expr");
-x3::rule<struct _expo, double> expo("expo");
-x3::rule<struct _term, double> term("term");
-x3::rule<struct _factor, double> factor("factor");
+static x3::rule<struct _expr, double> expr("expr");
+static x3::rule<struct _expo, double> expo("expo");
+static x3::rule<struct _term, double> term("term");
+static x3::rule<struct _factor, double> factor("factor");
 
 using x3::_val, x3::_attr;
 
@@ -84,12 +84,12 @@ auto const term_def =
 ;
 // clang-format on
 
-auto expr_def = x3::skip(x3::space)[x3::eps > term > x3::eoi];
+static auto expr_def = x3::skip(x3::space)[x3::eps > term > x3::eoi];
 
 BOOST_SPIRIT_DEFINE(expr, term, factor, expo)  // This may need a compile definition -DBOOST_PP_VARIADICS=1 in NVCC
 } // namespace parsing
 
-auto eval(std::string_view text) try {
+static auto eval(std::string_view text) try {
 	double result;
 	if (!x3::parse(text.begin(), text.end(), calculator::parsing::expr, result)) {
 		throw std::runtime_error("cannot parse expression\n\"" + std::string{text} + "\"");

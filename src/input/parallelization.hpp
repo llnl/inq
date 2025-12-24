@@ -13,6 +13,7 @@
 
 #include <parallel/partition.hpp>
 #include <utils/factors.hpp>
+#include <utils/num_str.hpp>
 
 namespace inq {
 namespace input {
@@ -58,19 +59,51 @@ namespace input {
 
 		auto cart_comm(int nspin, int nkpoints, int nstates) const {
 			assert(nspin == 1 or nspin == 2);
+
+			{
+				auto requested_procs = std::max(1, nproc_domains_)*std::max(1, nproc_states_)*std::max(1, nproc_kpts_);
+				if(requested_procs > comm_.size()) {
+					throw std::runtime_error("INQ Error: the number of processors requested (" + utils::num_to_str("%d", requested_procs) + ") is larger than the number of processors (" + utils::num_to_str("%d", comm_.size()) + ").");
+				}
+			}
 			
-			auto actual_nproc_kpts = optimal_nprocs(nkpoints*nspin, comm_.size(), efficiency_threshold);
-			if(nproc_kpts_ != boost::mpi3::fill) actual_nproc_kpts = nproc_kpts_;
+			auto avail_procs = comm_.size();
+			if(nproc_domains_ != boost::mpi3::fill) {
+				if(nproc_domains_ > avail_procs or avail_procs%nproc_domains_ != 0) {
+					throw std::runtime_error("INQ Error: invalid number of parallel partitions requested (" + utils::num_to_str("%d", nproc_domains_) + ") for the number of available processors (" + utils::num_to_str("%d", avail_procs) + ").");
+				}
+				avail_procs /= nproc_domains_;
+			}
+
+			if(nproc_states_ != boost::mpi3::fill) {
+				if(nproc_states_ > avail_procs or avail_procs%nproc_states_ != 0) {
+					throw std::runtime_error("INQ Error: invalid number of parallel states processors requested (" + utils::num_to_str("%d", nproc_states_) + ") for the number of available processors (" + utils::num_to_str("%d", avail_procs) + ").");
+				}
+				avail_procs /= nproc_states_;
+			}
+
+			auto actual_nproc_kpts = optimal_nprocs(nkpoints*nspin, avail_procs, efficiency_threshold);
+			if(nproc_kpts_ != boost::mpi3::fill) {
+				if(nproc_kpts_ > avail_procs or avail_procs%nproc_kpts_ != 0) {
+					throw std::runtime_error("INQ Error: invalid number of parallel kpoints processors requested (" + utils::num_to_str("%d", nproc_kpts_) + ") for the number of available processors (" + utils::num_to_str("%d", avail_procs) + ").");
+				}
+				actual_nproc_kpts = nproc_kpts_;
+			} else {
+				avail_procs /= actual_nproc_kpts;
+			}
 
 			auto actual_nproc_states = nproc_states_;
 			if(actual_nproc_states == boost::mpi3::fill and nproc_domains_ == boost::mpi3::fill) {
-				actual_nproc_states = optimal_nprocs(nstates, comm_.size()/actual_nproc_kpts, efficiency_threshold);
+				actual_nproc_states = optimal_nprocs(nstates, avail_procs, efficiency_threshold);
 			}
 			
 			std::array<int, 3> nprocs;
 			nprocs[dimension_kpoints()] = actual_nproc_kpts;
 			nprocs[dimension_domains()] = nproc_domains_;
 			nprocs[dimension_states()] = actual_nproc_states;
+
+			assert(std::max(1, nprocs[dimension_kpoints()])*std::max(1, nprocs[dimension_domains()])*std::max(1, nprocs[dimension_states()]) <= comm_.size());
+			for(int idim = 0; idim < 3; idim++)	assert(nprocs[idim] == boost::mpi3::fill or comm_.size()%nprocs[idim] == 0);
 			
 			return parallel::cartesian_communicator<3>(comm_, nprocs);
     }

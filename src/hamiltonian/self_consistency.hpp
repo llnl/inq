@@ -93,8 +93,8 @@ public:
 		assert(core_density_.basis() == spin_density.basis());
 
 		auto total_density = observables::density::total(spin_density);
-			
-		energy.external(operations::integral_product(total_density, vion_));
+
+		assert(total_density.basis() == vion_.basis());
 
 		//IONIC POTENTIAL
 		auto vscalar = vion_;
@@ -111,6 +111,8 @@ public:
 		}
 
 		pert_.potential(time, vscalar);
+
+		energy.external(operations::integral_product(total_density, vscalar));
 		
 		// Hartree
 		if(theory_.hartree_potential()){
@@ -155,7 +157,7 @@ public:
 		// THE VECTOR POTENTIAL
 		
 		if(pert_.has_uniform_vector_potential()){
-			hamiltonian.uniform_vector_potential_ = potential_basis_.cell().metric().to_covariant(pert_.uniform_vector_potential(time));
+			hamiltonian.uniform_vector_potential_ = potential_basis_.cell().to_covariant(pert_.uniform_vector_potential(time));
 		} else {
 			hamiltonian.uniform_vector_potential_ = {0.0, 0.0, 0.0};
 		}

@@ -31,6 +31,15 @@ void orthogonalize(field_set_type & phi, bool nocheck = false){
 	operations::rotate_trs(olap, phi);
 }
 
+template <class field_set_type, typename Operator>
+void orthogonalize(field_set_type & phi, Operator op){
+	CALI_CXX_MARK_FUNCTION;
+
+	auto olap = overlap(phi,op(phi));
+	matrix::cholesky(olap);
+	operations::rotate_trs(olap, phi);
+}
+
 template <class field_set_type>
 void orthogonalize(field_set_type & phi1, field_set_type const & phi2){
 	CALI_CXX_MARK_FUNCTION;
@@ -56,6 +65,7 @@ void orthogonalize(field_set_type & phi1, field_set_type const & phi2){
 #ifdef INQ_OPERATIONS_ORTHOGONALIZE_UNIT_TEST
 #undef INQ_OPERATIONS_ORTHOGONALIZE_UNIT_TEST
 
+#include <basis/trivial.hpp>
 #include <catch2/catch_all.hpp>
 #include <operations/randomize.hpp>
 
@@ -240,7 +250,50 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		}
 		
 	}
-	
+
+	SECTION("Orthogonalize w.r.t. non diagonal matrix complex"){
+  
+		const int npoint = 100;
+		const int nvec = 12;
+
+
+		gpu::array<complex, 2> matrix({npoint, npoint});
+		
+		for(int ip = 0; ip < npoint; ip++){
+			for(int jp = 0; jp < npoint; jp++){
+				matrix[ip][jp] = 1e-3*ip*jp;
+				if(ip == jp) matrix[ip][jp] = ip + 1.0;
+			}
+		}
+		
+		operations::matrix_operator<complex> op(std::move(matrix));
+		
+		basis::trivial bas(npoint, parallel::communicator{boost::mpi3::environment::get_self_instance()});
+		basis::field_set<basis::trivial, complex> phi(bas, nvec);
+
+		for(int ip = 0; ip < npoint; ip++){
+			for(int ivec = 0; ivec < nvec; ivec++){
+				phi.matrix()[ip][ivec] = exp(complex(0.0, (ip*ivec)*0.1));
+			}
+		}
+		auto matrix_op = [& op](auto const & phi ){
+			return op(phi);
+		};
+		operations::orthogonalize(phi,matrix_op);
+		auto olap = operations::overlap(phi, matrix_op(phi));
+		auto olap_array = matrix::all_gather(olap);
+
+		for(int ii = 0; ii < nvec; ii++){
+			for(int jj = 0; jj < nvec; jj++){
+				if(ii == jj) {
+					CHECK(real(olap_array[ii][ii]) == 1.0_a);
+					CHECK(fabs(imag(olap_array[ii][ii])) < 1e-16);
+				} else {
+					CHECK(fabs(olap_array[ii][jj]) < 5e-16);
+				}
+			}
+		}
+	}
 	
 }
 #endif

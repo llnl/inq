@@ -21,11 +21,20 @@ namespace inq {
 namespace ground_state {
 	
 void initial_guess(const systems::ions & ions, systems::electrons & electrons, std::vector<vector3<double>> const & magnet_dir = {}){
-
+	CALI_CXX_MARK_FUNCTION;
+	
 	int iphi = 0;
 	for(auto & phi : electrons.kpin()) {
 		operations::randomize(phi, iphi + electrons.kpin_part().start());
-		operations::orthogonalize(phi);
+		if(electrons.atomic_pot().has_overlap()){
+			hamiltonian::ks_hamiltonian<double> ham(electrons.states_basis(), electrons.brillouin_zone(), electrons.states(), electrons.atomic_pot(), ions, 0.0, /* use_ace = */ true);
+			auto overlap_operator = [&ham](auto const & phi ){
+				return ham.overlap(phi);
+			};
+			operations::orthogonalize(phi,overlap_operator);
+		} else {
+			operations::orthogonalize(phi);
+		}
 		for(long ist = 0; ist < phi.local_spinor_set_size(); ist++) electrons.eigenvalues()[iphi][ist] = ist + phi.spinor_set_part().start() + (iphi + electrons.kpin_part().start())/double(electrons.kpin_part().size());
 
 		iphi++;
@@ -66,7 +75,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ions.insert("H", {0.0_b, 0.0_b, 0.0_b});
 		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_unpolarized());
 		ground_state::initial_guess(ions, electrons);
-		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)     == 1.0);
+		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
 	}
 
 	SECTION("Spin polarized initialization") {
@@ -75,25 +84,25 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ions.insert("H", {0.0_b, 0.0_b, 0.0_b});
 		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_polarized());
 		ground_state::initial_guess(ions, electrons);
-		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)     == 1.0);
+		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
 
 		std::vector<vector3<double>> magnet_init;
 		magnet_init.push_back({0.0, 0.0, 1.0});
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_polarized());
 		ground_state::initial_guess(ions, electrons, magnet_init);
 		auto mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)     == 1.0);
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                 == 1.0);
-		CHECK(Approx(sqrt(mag[0]*mag[0]+mag[1]*mag[1])/sqrt(norm(mag))).epsilon(1.e-10)      == 0.0);
+		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																 == 1.0);
+		CHECK(Approx(sqrt(mag[0]*mag[0]+mag[1]*mag[1])/sqrt(norm(mag))).epsilon(1.e-10)			 == 0.0);
 
 		magnet_init.clear();
 		magnet_init.push_back({0.0, 0.0, -1.0});
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_polarized());
 		ground_state::initial_guess(ions, electrons, magnet_init);
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)     == 1.0);
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                 == -1.0);
-		CHECK(Approx(sqrt(mag[0]*mag[0]+mag[1]*mag[1])/sqrt(norm(mag))).epsilon(1.e-10)      == 0.0);
+		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																 == -1.0);
+		CHECK(Approx(sqrt(mag[0]*mag[0]+mag[1]*mag[1])/sqrt(norm(mag))).epsilon(1.e-10)			 == 0.0);
 	}
 
 	SECTION("Spin non collinear initialization") {
@@ -102,7 +111,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ions.insert("H", {0.0_b, 0.0_b, 0.0_b});
 		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
 		ground_state::initial_guess(ions, electrons);
-		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)     == 1.0);
+		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
 
 		std::vector<vector3<double>> magnet_init;
 		magnet_init.push_back({0.0, 0.0, 1.0});
@@ -134,10 +143,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                        == 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(2.0));
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(2.0));
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 0.0);
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
+		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(2.0));
+		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(2.0));
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 0.0);
 
 		magnet_init.clear();
 		mv = {1.0, -1.0, 0.0};
@@ -147,10 +156,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                        == 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(2.0));
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)                                  == -1.0/sqrt(2.0));
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 0.0);
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
+		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(2.0));
+		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== -1.0/sqrt(2.0));
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 0.0);
 
 		magnet_init.clear();
 		mv = {-1.0, -1.0, 0.0};
@@ -160,10 +169,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                        == 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)                                  == -1.0/sqrt(2.0));
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)                                  == -1.0/sqrt(2.0));
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 0.0);
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
+		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																	== -1.0/sqrt(2.0));
+		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== -1.0/sqrt(2.0));
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 0.0);
 
 		magnet_init.clear();
 		mv = {1.0, 1.0, 1.0};
@@ -173,11 +182,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                        == 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
-		
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
+		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
+		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
 	}
 }
 #endif

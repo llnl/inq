@@ -11,7 +11,8 @@
 
 #include <input/environment.hpp>
 #include <ground_state/initial_guess.hpp>
-#include <ground_state/calculate.hpp>
+#include <ground_state/calculator.hpp>
+#include <interface/runtime_options.hpp>
 #include <real_time/propagate.hpp>
 #include <real_time/results.hpp>
 
@@ -74,7 +75,7 @@ These are the options available:
 )"""";
 	}
 
-	static void ground_state() {
+	static void ground_state(runtime_options const & run_opts = {}) {
 		auto ions = systems::ions::load(".inq/default_ions");
 
 		auto bz = ionic::brillouin(systems::ions::load(".inq/default_ions"), input::kpoints::gamma());
@@ -95,7 +96,7 @@ These are the options available:
 		electrons.save(".inq/default_orbitals");
 	}
 
-	static void real_time() {
+	static void real_time(runtime_options const & run_opts = {}) {
 		auto ions = systems::ions::load(".inq/default_ions");
 
 		auto bz = ionic::brillouin(systems::ions::load(".inq/default_ions"), input::kpoints::gamma());
@@ -105,7 +106,8 @@ These are the options available:
 			bz.save(input::environment::global().comm(), ".inq/default_brillouin");
 		}
 		
-		systems::electrons electrons(input::environment::global().par().states(), ions, options::electrons::load(".inq/default_electrons_options"), bz);
+		auto par = input::environment::global().par().kpoints(run_opts.par_kpoints).states(run_opts.par_states).domains(run_opts.par_domains);
+		systems::electrons electrons(par, ions, options::electrons::load(".inq/default_electrons_options"), bz);
  
 		if(not electrons.try_load(".inq/default_orbitals")) actions::error(input::environment::global().comm(), "Cannot load a ground-state electron configuration for a real-time run.\n Please run a ground-state first.");
 
@@ -118,7 +120,7 @@ These are the options available:
 
 	}
 
-	static void resume() {
+	static void resume(runtime_options const & run_opts = {}) {
 
 		auto dirname = std::string(".inq/default_checkpoint/");
 		
@@ -162,22 +164,22 @@ These are the options available:
 	
 	
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 		
 		if(args.size() == 0) actions::error(input::environment::global().comm(), "Missing argument to the 'run' command");
 		
 		if(args.size() == 1 and args[0] == "ground-state") {
-			ground_state();
+			ground_state(run_opts);
 			actions::normal_exit();
 		}
 				
 		if(args.size() == 1 and args[0] == "real-time") {
-			real_time();
+			real_time(run_opts);
 			actions::normal_exit();
 		}
 						
 		if(args.size() == 1 and args[0] == "resume") {
-			resume();
+			resume(run_opts);
 			actions::normal_exit();
 		}
 		
@@ -191,9 +193,9 @@ These are the options available:
 		using namespace pybind11::literals;
  
 		auto sub = module.def_submodule(name(), help());
-		sub.def("ground_state", &ground_state);
-		sub.def("real_time",    &real_time);
-		sub.def("resume",       &resume);
+		sub.def("ground_state", [](){ground_state();});
+		sub.def("real_time",    [](){real_time();});
+		sub.def("resume",       [](){resume();});
 		
 	}
 #endif

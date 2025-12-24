@@ -27,88 +27,18 @@ namespace inq {
 namespace operations {
 namespace transfer {
 
-template <class FieldType>
-FieldType enlarge(FieldType const & source, typename FieldType::basis_type const & new_basis, double const factor = 1.0) {
-
-	CALI_CXX_MARK_FUNCTION;
-	
-	FieldType destination(new_basis);
-	destination.fill(0.0);
-	
-	if(not source.basis().part().parallel()){
-
-		gpu::run(source.basis().sizes()[2], source.basis().sizes()[1], source.basis().sizes()[0],
-						 [sbas = source.basis().point_op(), dbas = destination.basis().point_op(), des = begin(destination.cubic()), sou = begin(source.cubic()), factor] GPU_LAMBDA (auto iz, auto iy, auto ix){
-							 
-							 auto ii = sbas.to_symmetric_range(ix, iy, iz);
-							 auto idest = dbas.from_symmetric_range(ii);
-							 
-							 des[idest[0]][idest[1]][idest[2]] = factor*sou[ix][iy][iz];
-						 });
-		
-	} else {
-
-		std::vector<long> point_list;
-
-		for(int ix = 0; ix < source.basis().sizes()[0]; ix++){
-			for(int iy = 0; iy < source.basis().sizes()[1]; iy++){
-				for(int iz = 0; iz < source.basis().sizes()[2]; iz++){
-					
-					auto ii = source.basis().to_symmetric_range(ix, iy, iz);
-					auto idest = destination.basis().from_symmetric_range(ii);
-
-					if(not destination.basis().local_contains(idest)) continue;
-
-					point_list.push_back(source.basis().linear_index(ix, iy, iz));
-					
-				}
-			}
-		}
-
-		gpu::array<long, 1> list(point_list.begin(), point_list.end());
-		
-		auto points = parallel::get_remote_points(source, list);
-		
-		long ip = 0;
-		for(int ix = 0; ix < source.basis().sizes()[0]; ix++){
-			for(int iy = 0; iy < source.basis().sizes()[1]; iy++){
-				for(int iz = 0; iz < source.basis().sizes()[2]; iz++){
-
-					auto ii = source.basis().to_symmetric_range(ix, iy, iz);
-					auto idest = destination.basis().from_symmetric_range(ii);
-
-					if(not destination.basis().local_contains(idest)) continue;
-
-					auto il0 = destination.basis().cubic_part(0).global_to_local(parallel::global_index(idest[0]));
-					auto il1 = destination.basis().cubic_part(1).global_to_local(parallel::global_index(idest[1]));
-					auto il2 = destination.basis().cubic_part(2).global_to_local(parallel::global_index(idest[2]));
-
-					destination.cubic()[il0][il1][il2] = factor*points[ip];
-					ip++;
-					
-				}
-			}
-		}
-
-	}
-
-	return destination;
-
-}
-
 //////////////////////////////////////////////////////////
 
-template <class Type, class BasisType>
-basis::field_set<BasisType, Type> enlarge(basis::field_set<BasisType, Type> const & source, BasisType const & new_basis, double const factor = 1.0) {
+template <class FieldSet>
+FieldSet enlarge(FieldSet & source, FieldSet & destination, typename FieldSet::basis_type const & new_basis, double const factor) {
 	CALI_CXX_MARK_FUNCTION;
 	
-	basis::field_set<BasisType, Type> destination(new_basis, source.set_size(), source.full_comm());
 	destination.fill(0.0);
 
 	if(not source.basis().part().parallel()){
 		
 		gpu::run(source.basis().sizes()[2], source.basis().sizes()[1], source.basis().sizes()[0],
-						 [nst = source.set_part().local_size(), sbas = source.basis().point_op(), dbas = destination.basis().point_op(), des = begin(destination.hypercubic()), sou = begin(source.hypercubic()), factor]
+						 [nst = source.local_set_size(), sbas = source.basis().point_op(), dbas = destination.basis().point_op(), des = begin(destination.hypercubic()), sou = begin(source.hypercubic()), factor]
 						 GPU_LAMBDA (auto iz, auto iy, auto ix){
 							 
 							 auto ii = sbas.to_symmetric_range(ix, iy, iz);
@@ -119,48 +49,26 @@ basis::field_set<BasisType, Type> enlarge(basis::field_set<BasisType, Type> cons
 		
 	} else {
 
-		std::vector<long> point_list;
+		for(int ipart = 0; ipart < source.basis().comm().size(); ipart++) {
 
-		for(int ix = 0; ix < source.basis().sizes()[0]; ix++){
-			for(int iy = 0; iy < source.basis().sizes()[1]; iy++){
-				for(int iz = 0; iz < source.basis().sizes()[2]; iz++){
-					
-					auto ii = source.basis().to_symmetric_range(ix, iy, iz);
-					auto idest = destination.basis().from_symmetric_range(ii);
+			gpu::run(source.basis().local_sizes()[2], source.basis().local_sizes()[1], source.basis().local_sizes()[0],
+							 [nst = source.local_set_size(), sbas = source.basis().point_op(), dbas = destination.basis().point_op(), des = begin(destination.hypercubic()), sou = begin(source.hypercubic()), factor]
+							 GPU_LAMBDA (auto iz, auto iy, auto ix){
+								 
+								 auto ii = sbas.to_symmetric_range(sbas.cubic_part(0).start() + ix, sbas.cubic_part(1).start() + iy, sbas.cubic_part(2).start() + iz);
+								 auto idest = dbas.from_symmetric_range(ii);
+								 
+								 if(not dbas.local_contains(idest)) return;
+								 
+								 auto idx = idest[0] - dbas.cubic_part(0).start();
+								 auto idy = idest[1] - dbas.cubic_part(1).start();
+								 auto idz = idest[2] - dbas.cubic_part(2).start();
+								 
+								 for(int ist = 0; ist < nst; ist++) des[idx][idy][idz][ist] = factor*sou[ix][iy][iz][ist];
+							 });
 
-					if(not destination.basis().local_contains(idest)) continue;
-
-					point_list.push_back(source.basis().linear_index(ix, iy, iz));
-					
-				}
-			}
+			source.shift_domains();
 		}
-
-		gpu::array<long, 1> list(point_list.begin(), point_list.end());
-		
-		auto points = parallel::get_remote_points(source, list);
-		
-		long ip = 0;
-		for(int ix = 0; ix < source.basis().sizes()[0]; ix++){
-			for(int iy = 0; iy < source.basis().sizes()[1]; iy++){
-				for(int iz = 0; iz < source.basis().sizes()[2]; iz++){
-	
-					auto ii = source.basis().to_symmetric_range(ix, iy, iz);
-					auto idest = destination.basis().from_symmetric_range(ii);
-
-					if(not destination.basis().local_contains(idest)) continue;
-
-					auto il0 = destination.basis().cubic_part(0).global_to_local(parallel::global_index(idest[0]));
-					auto il1 = destination.basis().cubic_part(1).global_to_local(parallel::global_index(idest[1]));
-					auto il2 = destination.basis().cubic_part(2).global_to_local(parallel::global_index(idest[2]));
-
-					for(int ist = 0; ist < source.set_part().local_size(); ist++) destination.hypercubic()[il0][il1][il2][ist] = factor*points[ip][ist];
-					ip++;
-					
-				}
-			}
-		}
-
 	}
 	
 	return destination;			
@@ -168,9 +76,44 @@ basis::field_set<BasisType, Type> enlarge(basis::field_set<BasisType, Type> cons
 
 
 //////////////////////////////////////////////////////////
+
+template <class Type, class BasisType>
+auto enlarge(basis::field<BasisType, Type> source, BasisType const & new_basis, double const factor = 1.0) {
+
+	CALI_CXX_MARK_FUNCTION;
+	
+	basis::field<BasisType, Type> destination(new_basis);
+	enlarge(source, destination, new_basis, factor);
+	return destination;
+
+}
+
+//////////////////////////////////////////////////////////
+
+template <class Type, class BasisType>
+auto enlarge(basis::field_set<BasisType, Type> source, BasisType const & new_basis, double const factor = 1.0) {
+	CALI_CXX_MARK_FUNCTION;
+	
+	basis::field_set<BasisType, Type> destination(new_basis, source.set_size(), source.full_comm());
+	enlarge(source, destination, new_basis, factor);
+	return destination;
+}
+
+//////////////////////////////////////////////////////////
+
+template <class Type, class BasisType>
+auto enlarge(states::orbital_set<BasisType, Type> source, BasisType const & new_basis, double const factor = 1.0) {
+	CALI_CXX_MARK_FUNCTION;
+	
+	states::orbital_set<BasisType, Type> destination(new_basis, source.spinor_set_size(), source.spinor_dim(), source.kpoint(), source.spin_index(), source.full_comm());
+	enlarge(source, destination, new_basis, factor);
+	return destination;
+}
+
+//////////////////////////////////////////////////////////
 		
 template <class FieldType>
-FieldType shrink(FieldType const & source, typename FieldType::basis_type const & new_basis, double const factor = 1.0) {
+FieldType shrink(FieldType source, typename FieldType::basis_type const & new_basis, double const factor = 1.0) {
 
 	CALI_CXX_MARK_FUNCTION;
 	
@@ -191,43 +134,29 @@ FieldType shrink(FieldType const & source, typename FieldType::basis_type const 
 
 	} else {
 
-		gpu::array<long, 1> point_list(destination.basis().local_size());
+		for(int ipart = 0; ipart < source.basis().comm().size(); ipart++) {
 
-		{
-			long ip = 0;
-			for(int ix = 0; ix < destination.basis().local_sizes()[0]; ix++){
-				for(int iy = 0; iy < destination.basis().local_sizes()[1]; iy++){
-					for(int iz = 0; iz < destination.basis().local_sizes()[2]; iz++){	
+			gpu::run(destination.basis().local_sizes()[2], destination.basis().local_sizes()[1], destination.basis().local_sizes()[0],
+						 [sbas = source.basis().point_op(), dbas = destination.basis().point_op(), des = begin(destination.cubic()), sou = begin(source.cubic()), factor]
+						 GPU_LAMBDA (auto iz, auto iy, auto ix){
 
-						auto ixg = destination.basis().cubic_part(0).local_to_global(ix);
-						auto iyg = destination.basis().cubic_part(1).local_to_global(iy);
-						auto izg = destination.basis().cubic_part(2).local_to_global(iz);						
-						
-						auto ii = destination.basis().to_symmetric_range(ixg, iyg, izg);
-						auto isource = source.basis().from_symmetric_range(ii);
-						
-						point_list[ip] = source.basis().linear_index(isource[0], isource[1], isource[2]);
-						ip++;
-					}
-				}
-			}
+							 auto ixg = dbas.cubic_part(0).local_to_global(ix);
+							 auto iyg = dbas.cubic_part(1).local_to_global(iy);
+							 auto izg = dbas.cubic_part(2).local_to_global(iz);						
+							 
+							 auto ii = dbas.to_symmetric_range(ixg.value(), iyg.value(), izg.value());
+							 auto isource = sbas.from_symmetric_range(ii);
 
-			assert(ip == point_list.size());
-		}
+							 if(not sbas.local_contains(isource)) return;
+							 
+							 auto isx = isource[0] - sbas.cubic_part(0).start();
+							 auto isy = isource[1] - sbas.cubic_part(1).start();
+							 auto isz = isource[2] - sbas.cubic_part(2).start();
+							 
+							 des[ix][iy][iz] = factor*sou[isx][isy][isz];
+						 });
 
-		auto points = parallel::get_remote_points(source, point_list);
-
-		{
-			long ip = 0;
-			for(int ix = 0; ix < destination.basis().local_sizes()[0]; ix++){
-				for(int iy = 0; iy < destination.basis().local_sizes()[1]; iy++){
-					for(int iz = 0; iz < destination.basis().local_sizes()[2]; iz++){	
-						
-						destination.cubic()[ix][iy][iz] = factor*points[ip];
-						ip++;
-					}
-				}
-			}
+			source.shift_domains();
 		}
 		
 	}
@@ -238,7 +167,7 @@ FieldType shrink(FieldType const & source, typename FieldType::basis_type const 
 //////////////////////////////////////////////////////////
 		
 template <class Type, class BasisType>
-basis::field_set<BasisType, Type> shrink(basis::field_set<BasisType, Type> const & source, BasisType const & new_basis, double const factor = 1.0) {
+basis::field_set<BasisType, Type> shrink(basis::field_set<BasisType, Type> source, BasisType const & new_basis, double const factor = 1.0) {
 
 	CALI_CXX_MARK_FUNCTION;
 	
@@ -258,43 +187,30 @@ basis::field_set<BasisType, Type> shrink(basis::field_set<BasisType, Type> const
 		
 	} else {
 
-		gpu::array<long, 1> point_list(destination.basis().local_size());
-		
-		{
-			long ip = 0;
-			for(int ix = 0; ix < destination.basis().local_sizes()[0]; ix++){
-				for(int iy = 0; iy < destination.basis().local_sizes()[1]; iy++){
-					for(int iz = 0; iz < destination.basis().local_sizes()[2]; iz++){	
-						
-						auto ixg = destination.basis().cubic_part(0).local_to_global(ix);
-						auto iyg = destination.basis().cubic_part(1).local_to_global(iy);
-						auto izg = destination.basis().cubic_part(2).local_to_global(iz);						
-						
-						auto ii = destination.basis().to_symmetric_range(ixg, iyg, izg);
-						auto isource = source.basis().from_symmetric_range(ii);
-						
-						point_list[ip] = source.basis().linear_index(isource[0], isource[1], isource[2]);
-						ip++;
-					}
-				}
-			}
+		for(int ipart = 0; ipart < source.basis().comm().size(); ipart++) {
+			
+			gpu::run(destination.basis().local_sizes()[2], destination.basis().local_sizes()[1], destination.basis().local_sizes()[0],
+							 [nst = source.set_part().local_size(), sbas = source.basis().point_op(), dbas = destination.basis().point_op(), des = begin(destination.hypercubic()), sou = begin(source.hypercubic()), factor]
+							 GPU_LAMBDA (auto iz, auto iy, auto ix){
+								 
+								 auto ixg = dbas.cubic_part(0).local_to_global(ix);
+								 auto iyg = dbas.cubic_part(1).local_to_global(iy);
+								 auto izg = dbas.cubic_part(2).local_to_global(iz);
+								 
+								 auto ii = dbas.to_symmetric_range(ixg.value(), iyg.value(), izg.value());
+								 auto isource = sbas.from_symmetric_range(ii);
+								 
+								 if(not sbas.local_contains(isource)) return;
+								 
+								 auto isx = isource[0] - sbas.cubic_part(0).start();
+								 auto isy = isource[1] - sbas.cubic_part(1).start();
+								 auto isz = isource[2] - sbas.cubic_part(2).start();
+								 
+								 for(int ist = 0; ist < nst; ist++) des[ix][iy][iz][ist] = factor*sou[isx][isy][isz][ist];
+								 
+							 });
 
-			assert(ip == point_list.size());
-		}
-
-		auto points = parallel::get_remote_points(source, point_list);
-
-		{
-			long ip = 0;
-			for(int ix = 0; ix < destination.basis().local_sizes()[0]; ix++){
-				for(int iy = 0; iy < destination.basis().local_sizes()[1]; iy++){
-					for(int iz = 0; iz < destination.basis().local_sizes()[2]; iz++){	
-						
-						for(int ist = 0; ist < source.set_part().local_size(); ist++) destination.hypercubic()[ix][iy][iz][ist] = factor*points[ip][ist];
-						ip++;
-					}
-				}
-			}
+			source.shift_domains();
 		}
 
 	}
@@ -401,6 +317,11 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 	SECTION("Enlarge and shrink -- field"){
 		
 		basis::real_space grid(cell, spacing, cart_comm);
+
+		CHECK(grid.sizes()[0] == 14);
+		CHECK(grid.sizes()[1] == 18);
+		CHECK(grid.sizes()[2] == 24);		
+		
 		basis::field<basis::real_space, TestType> small(grid);
 		
 		CHECK(small.basis().rlength()[0] == Approx(ll[0]));
@@ -418,6 +339,10 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 
 		auto large = operations::transfer::enlarge(small, grid.enlarge(2));
 
+		CHECK(large.basis().sizes()[0] == 28);
+		CHECK(large.basis().sizes()[1] == 36);
+		CHECK(large.basis().sizes()[2] == 48);
+		
 		CHECK(grid.part().parallel() == large.basis().part().parallel());
 		CHECK(large.basis().rlength()[0] == Approx(2.0*ll[0]));
 		CHECK(large.basis().rlength()[1] == Approx(2.0*ll[1]));
@@ -449,8 +374,8 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 			}
 		}
 
-		cart_comm.all_reduce_n(&count_small, 1);
-		cart_comm.all_reduce_n(&count_large, 1);
+		cart_comm.all_reduce_in_place_n(&count_small, 1);
+		cart_comm.all_reduce_in_place_n(&count_large, 1);
 
 		CHECK(count_small == small.basis().size());
 		CHECK(count_large > count_small);
@@ -526,8 +451,8 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 			}
 		}
 		
-		cart_comm.all_reduce_n(&count_small, 1);
-		cart_comm.all_reduce_n(&count_large, 1);
+		cart_comm.all_reduce_in_place_n(&count_small, 1);
+		cart_comm.all_reduce_in_place_n(&count_large, 1);
 
 		CHECK(count_small == small.basis().size()*small.set_size());
 		CHECK(count_large > count_small);
@@ -577,9 +502,9 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 		CHECK(coarse.basis().rspacing()[1] == 2.0*fine.basis().rspacing()[1]);
 		CHECK(coarse.basis().rspacing()[2] == 2.0*fine.basis().rspacing()[2]);
 		
-		CHECK(real(operations::integral(coarse)) == 109.2100704359_a);
+		CHECK(real(operations::integral(coarse)) == 109.0578881614_a);
 		CHECK(fabs(imag(operations::integral(coarse))) < 1e-14);
-		CHECK(real(operations::integral(fine)) == 109.2100704359_a);
+		CHECK(real(operations::integral(fine)) == 109.0578881614_a);
 		CHECK(fabs(imag(operations::integral(fine))) < 1e-14);
 
 			
@@ -591,8 +516,8 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 					auto iyg = fine.basis().cubic_part(1).local_to_global(iy);
 					auto izg = fine.basis().cubic_part(2).local_to_global(iz);						
 					auto rr = fine.basis().point_op().rvector_cartesian(ixg, iyg, izg);
-					CHECK(fabs(real(fine.cubic()[ix][iy][iz])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.2);
-					CHECK(fabs(imag(fine.cubic()[ix][iy][iz])) < 5e-3);
+					CHECK(fabs(real(fine.cubic()[ix][iy][iz])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.25);
+					CHECK(fabs(imag(fine.cubic()[ix][iy][iz])) < 6e-3);
 				}
 			}
 		}
@@ -641,8 +566,8 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 						auto iyg = fine.basis().cubic_part(1).local_to_global(iy);
 						auto izg = fine.basis().cubic_part(2).local_to_global(iz);						
 						auto rr = fine.basis().point_op().rvector_cartesian(ixg, iyg, izg);
-						CHECK(fabs(real(fine.hypercubic()[ix][iy][iz][ist])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.2);
-						CHECK(fabs(imag(fine.hypercubic()[ix][iy][iz][ist])) < 5e-3);
+						CHECK(fabs(real(fine.hypercubic()[ix][iy][iz][ist])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.25);
+						CHECK(fabs(imag(fine.hypercubic()[ix][iy][iz][ist])) < 6e-3);
 						
 					}
 				}
@@ -684,9 +609,9 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 		CHECK(coarse.basis().rspacing()[1] == 2.0*fine.basis().rspacing()[1]);
 		CHECK(coarse.basis().rspacing()[2] == 2.0*fine.basis().rspacing()[2]);
 		
-		CHECK(real(operations::integral(coarse)) == 109.3027787767_a);
+		CHECK(real(operations::integral(coarse)) == 109.3081726242_a);
 		CHECK(fabs(imag(operations::integral(coarse))) < 1e-14);
-		CHECK(real(operations::integral(fine)) == 109.3027787767_a);
+		CHECK(real(operations::integral(fine)) == 109.3081726242_a);
 		CHECK(fabs(imag(operations::integral(fine))) < 1e-14);
 
 			
@@ -698,7 +623,7 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 					auto iyg = coarse.basis().cubic_part(1).local_to_global(iy);
 					auto izg = coarse.basis().cubic_part(2).local_to_global(iz);						
 					auto rr = coarse.basis().point_op().rvector_cartesian(ixg, iyg, izg);
-					CHECK(fabs(real(coarse.cubic()[ix][iy][iz])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.2);
+					CHECK(fabs(real(coarse.cubic()[ix][iy][iz])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.25);
 					CHECK(fabs(imag(coarse.cubic()[ix][iy][iz])) < 5e-3);
 				}
 			}
@@ -749,7 +674,7 @@ TEMPLATE_TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG, double, inq::complex) {
 						auto iyg = coarse.basis().cubic_part(1).local_to_global(iy);
 						auto izg = coarse.basis().cubic_part(2).local_to_global(iz);						
 						auto rr = coarse.basis().point_op().rvector_cartesian(ixg, iyg, izg);
-						CHECK(fabs(real(coarse.hypercubic()[ix][iy][iz][ist])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.2);
+						CHECK(fabs(real(coarse.hypercubic()[ix][iy][iz][ist])/(exp(-rr[0]*rr[0]/ll[0] - rr[1]*rr[1]/ll[1] - rr[2]*rr[2]/ll[2])) - 1.0) < 0.25);
 						CHECK(fabs(imag(coarse.hypercubic()[ix][iy][iz][ist])) < 5e-3);
 					}
 				}

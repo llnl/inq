@@ -11,6 +11,7 @@
 
 #include <input/environment.hpp>
 #include <interface/actions.hpp>
+#include <interface/runtime_options.hpp>
 
 namespace inq {
 namespace interface {
@@ -51,7 +52,7 @@ Python example: `pinq.clear()`
 	}
 
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool) const {
+	void command(ArgsType const & args, runtime_options const &) const {
 		if(args.size() != 0) actions::error(input::environment::global().comm(), "The 'clear' command doesn't take arguments");
 		clear();
 		actions::normal_exit();

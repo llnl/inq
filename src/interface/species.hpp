@@ -11,7 +11,6 @@
 
 #include <input/environment.hpp>
 #include <ground_state/initial_guess.hpp>
-#include <ground_state/calculate.hpp>
 #include <real_time/propagate.hpp>
 #include <real_time/results.hpp>
 
@@ -242,7 +241,7 @@ These are the options available:
 	}
 	
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 		
 		using utils::str_to;
 		

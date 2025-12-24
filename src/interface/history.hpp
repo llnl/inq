@@ -9,6 +9,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+#include <interface/runtime_options.hpp>
+
 namespace inq {
 namespace interface {
 
@@ -61,7 +63,7 @@ These are the available subcommands:
 	}
 
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 
 		if(args.size() == 0) {
 			std::ifstream hist_file(".inq_history");

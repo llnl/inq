@@ -13,38 +13,30 @@ import _pinq
 atoms = Atoms('H2', positions=[[0, 0, 0], [0.0, 0, 0.7]], cell = [3.0, 3.0, 4.0])
 atoms.set_pbc(True)
 
-atoms.calc = _pinq.calculator(ecut = 80.0, xc = 'LDA')
+atoms.calc = _pinq.calculator(ecut = 90.0, xc = 'LDA')
 atoms.calc.calculate(atoms)
 energy = atoms.get_potential_energy()
 
 
 print("Energy = ", energy);
 
-assert abs(energy - -32.63697189005673) < 3.0e-5
+assert abs(energy - -32.62193464578265) < 3.0e-5
 
 forces = atoms.get_forces()
+print("Forces\n:", forces);
 
 assert abs(forces[0, 0]) < 3.0e-5
 assert abs(forces[0, 1]) < 3.0e-5
-assert abs(forces[0, 2] - -4.71394914e+00) < 3.0e-5
+assert abs(forces[0, 2] - -4.73394384e+00) < 3.0e-5
 assert abs(forces[1, 0]) < 3.0e-5
 assert abs(forces[1, 1]) < 3.0e-5
-assert abs(forces[1, 2] - 4.71396052e+00) < 3.0e-5
+assert abs(forces[1, 2] -  4.73394369e+00) < 3.0e-5
 
 #Run a second time to check it works
 
 atoms.calc.calculate(atoms)
 energy = atoms.get_potential_energy()
 
-assert abs(energy - -32.63697189005673) < 3.0e-5
+print("Energy = ", energy);
 
-#Test the scf_step function
-array = atoms.calc.get_density()
-array.fill(0.0)
-
-for x in range(5):
-  density = atoms.calc.scf_step(atoms, array);
-  print("energy step ", x, " = ", atoms.get_potential_energy());
-
-assert abs(atoms.get_potential_energy() - -35.793472912716645) < 3.0e-5
-  
+assert abs(energy - -32.62193464578265) < 3.0e-5

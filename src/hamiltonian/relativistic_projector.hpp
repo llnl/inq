@@ -64,9 +64,9 @@ public:
 								 [bet = begin(beta_),
 									spline = ps.projector(iproj).function(),
 									sph = sphere_.ref(), ll, iproj_lm, twice_mj, twice_jj,
-									metric = basis.cell().metric()] GPU_LAMBDA (auto ipoint) {
+									cell = basis.cell()] GPU_LAMBDA (auto ipoint) {
 
-									 auto pos = metric.to_cartesian(sph.point_pos(ipoint));
+									 auto pos = cell.to_cartesian(sph.point_pos(ipoint));
 									 auto spinor_sph_harmomic = sharmonic::cartesian_spinor<complex>(twice_jj, twice_mj, twice_jj - 2*ll, pos[0], pos[1], pos[2]);
 									 auto radial = spline(sph.distance(ipoint));
 
@@ -126,6 +126,8 @@ public:
 	template <typename Type, typename KpointType>
 	gpu::array<Type, 3> gather(states::orbital_set<basis::real_space, Type> const & phi, KpointType const & kpoint) const {
 
+		CALI_CXX_MARK_SCOPE("relativistic_projector::gather");
+		
 		gpu::array<Type, 3> sphere_phi({sphere_.size(), phi.local_spinor_set_size(), 2});
 
 		gpu::run(phi.local_spinor_set_size(), sphere_.size(),
@@ -143,6 +145,8 @@ public:
 	
 	template <typename KpointType>
 	gpu::array<complex, 2> project(states::orbital_set<basis::real_space, complex> const & phi, KpointType const & kpoint) const {
+
+		CALI_CXX_MARK_SCOPE("relativistic_projector::project");
 
 		auto sphere_phi = gather(phi, kpoint);
 
@@ -169,6 +173,8 @@ public:
 	template <typename KpointType>
 	void apply(states::orbital_set<basis::real_space, complex> const & phi, states::orbital_set<basis::real_space, complex> & vnlphi, KpointType const & kpoint) const {
 
+		CALI_CXX_MARK_SCOPE("relativistic_projector::apply");
+		
 		auto projections = project(phi, kpoint);
 
 		gpu::run(phi.local_spinor_set_size(), nproj_,
@@ -189,9 +195,9 @@ public:
 								 red1 += bet[iproj][ip][1]*pp;
 							 }
 
-							 gpu::atomic::add(&gr[point[0]][point[1]][point[2]][0][ist], phase*red0);
-							 gpu::atomic::add(&gr[point[0]][point[1]][point[2]][1][ist], phase*red1);
-							 
+							 gpu::atomic(gr[point[0]][point[1]][point[2]][0][ist]) += phase*red0;
+							 gpu::atomic(gr[point[0]][point[1]][point[2]][1][ist]) += phase*red1;
+						 
 						 });
 	}
 
@@ -199,6 +205,9 @@ public:
 	
 	template <typename Occupations, typename KpointType>
 	double energy(states::orbital_set<basis::real_space, complex> const & phi, Occupations const & occupations, KpointType const & kpoint) const {
+
+		CALI_CXX_MARK_SCOPE("relativistic_projector::energy");
+				
 		auto projections = project(phi, kpoint);
 		
 		return gpu::run(gpu::reduce(phi.local_spinor_set_size()), gpu::reduce(nproj_), 0.0,
@@ -213,6 +222,8 @@ public:
 	template <typename PhiType, typename GPhiType, typename OccsType, typename KPoint>
 	void force(PhiType & phi, GPhiType const & gphi, OccsType const & occs, KPoint const & kpoint, gpu::array<vector3<double>, 1> & forces_non_local) const {
 
+		CALI_CXX_MARK_SCOPE("relativistic_projector::force");
+		
 		auto sphere_gphi = gather(gphi, kpoint);
 		auto projections = project(phi, kpoint);
 
@@ -234,7 +245,7 @@ public:
 													 return -2.0*oc[ist]*(real(red0*conj(gph[ip][ist][0])) + real(red1*conj(gph[ip][ist][1])));
 												 });
 
-		forces_non_local[iatom_] += phi.basis().volume_element()*phi.basis().cell().metric().to_cartesian(forc);
+		forces_non_local[iatom_] += phi.basis().volume_element()*phi.basis().cell().to_cartesian(forc);
 		
 	}
 	

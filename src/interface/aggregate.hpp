@@ -10,16 +10,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <inq_config.h>
+#include <interface/runtime_options.hpp>
 
 
 namespace inq {
 namespace interface {
 
 auto list_item(std::string const & name, std::string const & one_line){
-	auto align = 25ul;
-		assert(name.size() < align);
-		auto pad = std::string(align - name.size(), ' ');
-		return "  " + name + pad + one_line + '\n';
+	auto align = 35ul;
+	assert(name.size() < align);
+	auto pad = std::string(align - name.size(), ' ');
+	return "  " + name + pad + one_line + '\n';
 }
 
 template <typename Type>
@@ -33,8 +34,8 @@ struct item : public Type {
 		return list_item(Type::name(), Type::one_line());
 	}
 
-	auto execute(std::string const & comm, std::vector<std::string> const & args, bool quiet) const {
-		if(comm == Type::name()) Type::command(args, quiet);
+	auto execute(std::string const & comm, std::vector<std::string> const & args, runtime_options const & run_opts) const {
+		if(comm == Type::name()) Type::command(args, run_opts);
 	}
 
 	auto help(std::string const & comm) const {
@@ -64,9 +65,9 @@ public:
 		return agg1_.list() + agg2_.list();
 	}
 
-	auto execute(std::string const & comm, std::vector<std::string> const & args, bool quiet) const {
-		agg1_.execute(comm, args, quiet);
-		agg2_.execute(comm, args, quiet);
+	auto execute(std::string const & comm, std::vector<std::string> const & args, runtime_options const & run_opts) const {
+		agg1_.execute(comm, args, run_opts);
+		agg2_.execute(comm, args, run_opts);
 	}
 
 	auto help(std::string const & comm) const {

@@ -9,6 +9,7 @@
 #include <inq/inq.hpp>
 #include <interface/aggregate.hpp>
 #include <interface/aliases.hpp>
+#include <interface/runtime_options.hpp>
 
 using namespace inq;
 
@@ -38,19 +39,19 @@ int main(int argc, char* argv[]) {
 
 	auto all_helpers =
 		interface::item(interface::units)
-		+ interface::item(interface::results);
+		+ interface::item(interface::results)
+		+ interface::item(interface::parallelization);
 		
 	interface::history_file.add_entry(argc, argv);
-	
-	auto quiet = false;
-	auto debug = false;
+
+	interface::runtime_options run_opts;
 	
 	auto uniformize = [](auto arg){
 		arg = utils::lowercase(arg);
 		std::replace(arg.begin(), arg.end(), '_', '-'); //replace underscores with dashes
 		return arg;
 	};
-	
+
 	std::vector<std::string> args;
 	for(int iarg = 1; iarg < argc; iarg++) {
 		auto arg = std::string(argv[iarg]);
@@ -61,13 +62,50 @@ int main(int argc, char* argv[]) {
 		}
 		
 		if(arg == "-q" or arg == "--quiet") {
-			quiet = true;
+			run_opts.quiet = true;
 			continue;
 		}
 
 		if(arg == "-d" or arg == "--debug") {
-			debug = true;
+			run_opts.debug = true;
 			continue;
+		}
+
+		if(arg == "-pd") {
+			auto par = uniformize(std::string(argv[iarg + 1]));
+			if(par == "auto") {
+				run_opts.par_domains = boost::mpi3::fill;
+			} else {
+				run_opts.par_domains = utils::str_to<long>(par);
+			}
+			iarg++;
+			continue;
+		}
+
+		if(arg == "-ps") {
+			auto par = uniformize(std::string(argv[iarg + 1]));
+			if(par == "auto") {
+				run_opts.par_states = boost::mpi3::fill;
+			} else {
+				run_opts.par_states = utils::str_to<long>(par);
+			}
+			iarg++;
+			continue;
+		}
+		
+		if(arg == "-pk") {
+			auto par = uniformize(std::string(argv[iarg + 1]));
+			if(par == "auto") {
+				run_opts.par_kpoints = boost::mpi3::fill;
+			} else {
+				run_opts.par_kpoints = utils::str_to<long>(par);
+			}
+			iarg++;
+			continue;
+		}
+ 
+		if(arg.size() > 1 and arg[0] == '-' and std::isalpha(arg[1])) {
+			interface::actions::error(comm, "Unknown inq option '" + arg + "'.");
 		}
 
 		//if it's a filename, don't do anything to it
@@ -93,7 +131,7 @@ int main(int argc, char* argv[]) {
 				iarg++;
 			}
 		}
-		
+
 		if(iarg + 2 < argc){
 			auto fusion = uniformize(arg + argv[iarg + 1] + argv[iarg + 2]);
 			auto search = aliases.find(fusion);
@@ -106,7 +144,7 @@ int main(int argc, char* argv[]) {
 		args.emplace_back(arg);
 	}
 
-	if(debug) {
+	if(run_opts.debug) {
 		std::cout << "Processed arguments: ";
 		for(auto const & arg : args){
 			std::cout << "|" << arg;
@@ -121,7 +159,7 @@ int main(int argc, char* argv[]) {
 	auto command = args[0];
 	args.erase(args.begin());
 
-	all_commands.execute(command, args, quiet);
+	all_commands.execute(command, args, run_opts);
 	
 	if(command == "help") {
 		if(args.size() == 0){
@@ -136,6 +174,9 @@ int main(int argc, char* argv[]) {
 				std::cout << interface::list_item("-h,--help",  "Prints this help dialog");
 				std::cout << interface::list_item("-q,--quiet", "Run silently, do not print information unless explicitly asked to");
 				std::cout << interface::list_item("-d,--debug", "Print debug information (useful for inq developers)");
+				std::cout << interface::list_item("-pd,--parallelization-domains N", "Set the number of parallel domains used in the run. The default is 'auto'. Check `inq help parallelization` for details.");
+				std::cout << interface::list_item("-ps,--parallelization-states  N", "Set the number of processors the states are divided in. The default is 'auto'. Check `inq help parallelization` for details.");
+				std::cout << interface::list_item("-pk,--parallelization-kpoints N", "Set the number of processors the kpoints are divided in. The default is 'auto'. Check `inq help parallelization` for details.");
 				std::cout << "\nTo get more information about any command use: inq help <command>\n";
 				std::cout << "\nBesides commands, there is also some additional help topics you can read with 'help':\n\n";
 				std::cout << all_helpers.list();

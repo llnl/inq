@@ -10,6 +10,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <input/environment.hpp>
+#include <interface/runtime_options.hpp>
 #include <ionic/brillouin.hpp>
 
 namespace inq {
@@ -139,7 +140,7 @@ These are the options available:
   }
   
 	template <typename ArgsType>
-	void command(ArgsType const & args, bool const quiet) const {
+	void command(ArgsType const & args, runtime_options const & run_opts) const {
 
 		using utils::str_to;
 		
@@ -150,34 +151,34 @@ These are the options available:
 
     if(args.size() == 1 and args[0] == "gamma") {
 			gamma();
-      if(not quiet) operator()();
+      if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
     if(args.size() == 4 and args[0] == "grid") {
       
       grid(str_to<int>(args[1]), str_to<int>(args[2]), str_to<int>(args[3]));
-      if(not quiet) operator()();
+      if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
 
     if(args.size() == 4 and args[0] == "shifted-grid") {
       
       shifted_grid(str_to<int>(args[1]), str_to<int>(args[2]), str_to<int>(args[3]));
-      if(not quiet) operator()();
+      if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
     
     if(args.size() == 5 and args[0] == "insert") {
       
       insert(str_to<double>(args[1]), str_to<double>(args[2]), str_to<double>(args[3]), str_to<double>(args[4]));
-      if(not quiet) operator()();
+      if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
     
     if(args.size() == 1 and args[0] == "clear") {
 			clear();
-      if(not quiet) operator()();
+      if(not run_opts.quiet) operator()();
 			actions::normal_exit();
 		}
     

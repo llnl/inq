@@ -139,13 +139,13 @@ int main(int argc, char ** argv){
 			real_time::propagate<>(ions, electrons, output, options::theory{}.lda(), options::real_time{}.num_steps(nsteps).dt(0.055_atomictime), kick);
 			
 			match.check("ETRS length kick: dipole step   0", dip[0],  -0.000309741032);
-			match.check("ETRS length kick: dipole step  10", dip[10],  0.352439452823);
-			match.check("ETRS length kick: dipole step  20", dip[20],  0.516924511546);
-			match.check("ETRS length kick: dipole step  30", dip[30],  0.552695897606);
-			match.check("ETRS length kick: dipole step  40", dip[40],  0.505285716066);
-			match.check("ETRS length kick: dipole step  50", dip[50],  0.408432017486);
-			match.check("ETRS length kick: dipole step  60", dip[60],  0.286408872554);
-			match.check("ETRS length kick: dipole step  70", dip[70],  0.162609145400);
+			match.check("ETRS length kick: dipole step  10", dip[10], -0.353225338482);
+			match.check("ETRS length kick: dipole step  20", dip[20], -0.517982705117);
+			match.check("ETRS length kick: dipole step  30", dip[30], -0.554109329493);
+			match.check("ETRS length kick: dipole step  40", dip[40], -0.506630768030);
+			match.check("ETRS length kick: dipole step  50", dip[50], -0.411072088843);
+			match.check("ETRS length kick: dipole step  60", dip[60], -0.293501486218);
+			match.check("ETRS length kick: dipole step  70", dip[70], -0.174726584012);
 			
 			match.check("ETRS length kick: energy step   0", en[0],   -17.563616880918);
 			match.check("ETRS length kick: energy step  10", en[10],  -17.563606697534);
@@ -191,9 +191,9 @@ int main(int argc, char ** argv){
 			real_time::propagate<>(ions, electrons, output, options::theory{}.lda(), options::real_time{}.num_steps(nsteps).dt(0.055_atomictime), kick1 + kick2);
 
 			match.check("ETRS velocity kick: dipole step   0", dip[0],  -0.000309741032);
-			match.check("ETRS velocity kick: dipole step  10", dip[10],  0.352042693691);
-			match.check("ETRS velocity kick: dipole step  20", dip[20],  0.516780678116);
-			match.check("ETRS velocity kick: dipole step  30", dip[30],  0.552957962009);
+			match.check("ETRS velocity kick: dipole step  10", dip[10], -0.352667764228);
+			match.check("ETRS velocity kick: dipole step  20", dip[20], -0.517468633127);
+			match.check("ETRS velocity kick: dipole step  30", dip[30], -0.553770289583);
 
 			match.check("ETRS velocity kick: energy step   0", en[0],   -17.563920909871);
 			match.check("ETRS velocity kick: energy step  10", en[10],  -17.563906701155);
@@ -236,9 +236,9 @@ int main(int argc, char ** argv){
 			real_time::propagate<>(ions, electrons, output, options::theory{}.lda(), options::real_time{}.num_steps(nsteps).dt(0.055_atomictime), perts);
 
 			match.check("ETRS length kick: dipole step   0", dip[0],  -0.000309741032);
-			match.check("ETRS length kick: dipole step  10", dip[10],  0.352439452823);
-			match.check("ETRS length kick: dipole step  20", dip[20],  0.516924511546);
-			match.check("ETRS length kick: dipole step  30", dip[30],  0.552695897606);
+			match.check("ETRS length kick: dipole step  10", dip[10], -0.353225338482);
+			match.check("ETRS length kick: dipole step  20", dip[20], -0.517982705117);
+			match.check("ETRS length kick: dipole step  30", dip[30], -0.554109329493);
 			
 			match.check("ETRS length kick: energy step   0", en[0],   -17.563616880918);
 			match.check("ETRS length kick: energy step  10", en[10],  -17.563606697534);

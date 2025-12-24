@@ -100,6 +100,8 @@ if(ENABLE_HIP)
 
 	target_link_libraries(inq INTERFACE roc::rocthrust)
 
+  set(CMAKE_HIP_FLAGS "-fgpu-rdc ${CMAKE_HIP_FLAGS}")
+	
 	set(ENABLE_GPU TRUE)
 	set(GPU_LANGUAGE HIP)
 endif()

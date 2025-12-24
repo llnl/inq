@@ -212,9 +212,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 
 	parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 
-	if(comm.size() > 4) return;
-	
-	auto cell = systems::cell::orthorhombic(4.2_b, 3.5_b, 6.4_b).periodic();
+	auto cell = systems::cell::orthorhombic(4.2_b, 5.5_b, 6.4_b).periodic();
   auto kick = perturbations::kick(cell, {0.1, 0.2, 0.3}, perturbations::gauge::velocity);
 
 	SECTION("2 elements"){
@@ -296,7 +294,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		
 		parallel::communicator comm{boost::mpi3::environment::get_world_instance()};
 		
-		basis::real_space bas(systems::cell::orthorhombic(4.2_b, 3.5_b, 6.4_b).finite(), /*spacing =*/ 0.39770182, comm);
+		basis::real_space bas(systems::cell::orthorhombic(4.2_b, 5.5_b, 6.4_b).finite(), /*spacing =*/ 0.39770182, comm);
 		
 		CHECK(bas.cell().periodicity() == 0);
 		

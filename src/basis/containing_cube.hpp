@@ -24,22 +24,17 @@ void containing_cube(basis::real_space const & grid, vector3<double> const & pos
 		auto lointer = pos - radius/length(rec)*rec;
 		auto hiinter = pos + radius/length(rec)*rec;
 
-		auto dlo = grid.cell().metric().to_contravariant(lointer)[idir];
-		auto dhi = grid.cell().metric().to_contravariant(hiinter)[idir];
+		auto dlo = grid.cell().to_contravariant(lointer)[idir];
+		auto dhi = grid.cell().to_contravariant(hiinter)[idir];
 
 		lo[idir] = lround(floor(dlo/grid.contravariant_spacing()[idir]));
 		hi[idir] = lround(ceil(dhi/grid.contravariant_spacing()[idir])) + 1;
 
-		#if defined(__cpp_lib_clamp) and  (__cpp_lib_clamp >= 201603L)
-		lo[idir] = std::clamp(lo[idir], grid.symmetric_range_begin(idir), grid.symmetric_range_end(idir));
-		hi[idir] = std::clamp(hi[idir], grid.symmetric_range_begin(idir), grid.symmetric_range_end(idir));
-		#else
 		lo[idir] = std::max(lo[idir], grid.symmetric_range_begin(idir));
 		lo[idir] = std::min(lo[idir], grid.symmetric_range_end  (idir));
 
 		hi[idir] = std::max(hi[idir], grid.symmetric_range_begin(idir));
 		hi[idir] = std::min(hi[idir], grid.symmetric_range_end  (idir));
-		#endif
 	}
 	
 }
@@ -78,7 +73,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(lo[1] == -3);
 		CHECK(lo[2] == -6);
 		CHECK(hi[0] == 18);
-		CHECK(hi[1] == 16);
+		CHECK(hi[1] == 17);
 		CHECK(hi[2] == 13);		
 		
 		for(int ix = 0; ix < rs.sizes()[0]; ix++){

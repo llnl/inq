@@ -64,6 +64,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 	CHECK(zero<complex>() == complex{0.0, 0.0});
 	CHECK(zero<vector3<double>>() == vector3<double>{0.0, 0.0, 0.0});
 	CHECK(zero<vector3<complex>>() == vector3<complex>{complex{0.0, 0.0}, complex{0.0, 0.0}, complex{0.0, 0.0}});
+	CHECK(zero<vector3<vector3<double>>>() == vector3<vector3<double>>{vector3<double>{0.0, 0.0, 0.0}, vector3<double>{0.0, 0.0, 0.0}, vector3<double>{0.0, 0.0, 0.0}});
 	
 	CHECK(zero() == 0.0);
 	CHECK(zero() == complex{0.0, 0.0});

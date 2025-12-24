@@ -82,7 +82,7 @@ public:
 			});
 		}
 		
-		el.kpin_states_comm().all_reduce_n(&state_conv, 1);
+		el.kpin_states_comm().all_reduce_in_place_n(&state_conv, 1);
 		state_conv /= el.states().num_electrons();
 		
 		return state_conv;
@@ -266,6 +266,13 @@ public:
 	
 	
 };
+
+template <typename Perturbation = perturbations::none>
+auto calculate(systems::ions const & ions, systems::electrons & electrons, const options::theory & inter = {}, options::ground_state const & solver = {}, Perturbation const & pert = {}){
+	auto calc = calculator{ions, electrons, inter, solver, pert};
+	return calc(electrons);
+}
+
 }
 }
 #endif

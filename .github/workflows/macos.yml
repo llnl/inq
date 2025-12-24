@@ -20,11 +20,11 @@ jobs:
 
     - name: Configure system
       run: |
-          brew install cmake gcc gfortran open-mpi pkg-config fftw boost numpy
+          brew install cmake@3.24 gcc gfortran open-mpi pkg-config fftw boost numpy
           gfortran-14 --version
 
     - name: Configure CMake
-      run: FC=gfortran-14 cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} --install-prefix=$HOME
+      run: FC=gfortran-14 cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} --install-prefix=$HOME -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}

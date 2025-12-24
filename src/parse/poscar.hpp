@@ -118,7 +118,7 @@ public:
 					vector3<double, contravariant> pos;
 					poscar_file >> pos;
 					atoms_.emplace_back(ionic::species(species[ispecies]));
-					positions_.emplace_back(cell.metric().to_cartesian(pos));
+					positions_.emplace_back(cell.to_cartesian(pos));
 					std::getline(poscar_file, tail);					
 				}
 			}

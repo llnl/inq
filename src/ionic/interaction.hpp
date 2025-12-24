@@ -404,8 +404,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
     const double charge[2] = {4.0, 4.0};
     
     std::vector<vector3<double>> positions(2);
-    positions[0] = cell.metric().to_cartesian(vector3<double, contravariant>(0.0,  0.0,  0.0 ));
-    positions[1] = cell.metric().to_cartesian(vector3<double, contravariant>(0.25, 0.25, 0.25));
+    positions[0] = cell.to_cartesian(vector3<double, contravariant>(0.0,  0.0,  0.0 ));
+    positions[1] = cell.to_cartesian(vector3<double, contravariant>(0.25, 0.25, 0.25));
     
     double energy;
     std::vector<vector3<double>> forces(2);

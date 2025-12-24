@@ -3,7 +3,7 @@
 #ifndef INQ__MAGNITUDE__CHIRP
 #define INQ__MAGNITUDE__CHIRP
 
-// Copyright (C) 2019-2023 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
+// Copyright (C) 2019-2025 Lawrence Livermore National Security, LLC., Xavier Andrade, Alfredo A. Correa
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -18,15 +18,15 @@ namespace magnitude {
 
 struct chirp;
 
-auto operator "" _auchirp(long double val){
+auto operator ""_auchirp(long double val){
 	return inq::quantity<chirp>::from_atomic_units(val);
 }
 
-auto operator "" _invfs2(long double val){
+auto operator ""_invfs2(long double val){
 	return inq::quantity<chirp>::from_atomic_units(val/ ((1.0_fs).in_atomic_units() * (1.0_fs).in_atomic_units() ) );
 }
 
-auto operator "" _invps2(long double val){
+auto operator ""_invps2(long double val){
 	return inq::quantity<chirp>::from_atomic_units(val/ ((1.0_ps).in_atomic_units() * (1.0_ps).in_atomic_units() ) );
 }
 

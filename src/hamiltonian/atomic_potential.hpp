@@ -49,6 +49,7 @@ namespace hamiltonian {
 		pseudo::set default_pseudo_set_;
 		std::unordered_map<std::string, pseudopotential_type> pseudopotential_list_;
 		bool has_nlcc_;
+		bool has_overlap_;
 		basis::double_grid double_grid_;
 
 	public:
@@ -65,6 +66,7 @@ namespace hamiltonian {
 			gcutoff *= double_grid_.spacing_factor(); 
 			
 			has_nlcc_ = false;
+			has_overlap_= false;
 
 			for(auto const & species : species_list) {
 				if(pseudopotential_list_.find(species.symbol()) != pseudopotential_list_.end()) throw std::runtime_error("INQ Error: duplicated species");
@@ -87,6 +89,7 @@ namespace hamiltonian {
 				auto & pseudo = insert.first->second;
 				
 				has_nlcc_ = has_nlcc_ or pseudo.has_nlcc_density();
+				has_overlap_ = has_overlap_ or pseudo.has_overlap();
 			}
 
 		}
@@ -139,7 +142,7 @@ namespace hamiltonian {
 										spline = ps.short_range_potential().function()] GPU_LAMBDA (auto ipoint){
 										 auto rr = sph.distance(ipoint);
 										 auto potential_val = spline(rr);
-										 gpu::atomic::add(&pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]], potential_val);
+										 gpu::atomic(pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]]) += potential_val;
 									 });
 
 				} else {
@@ -151,9 +154,9 @@ namespace hamiltonian {
 										sph = sphere.ref(),
 										spline = ps.short_range_potential().function(),
 										dg = double_grid_.ref(),
-										spac = basis.rspacing(), metric = basis.cell().metric()] GPU_LAMBDA (auto ipoint){
-										 gpu::atomic::add(&pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]],
-																			dg.value([spline] GPU_LAMBDA (auto pos) { return spline(pos.length()); }, spac, metric.to_cartesian(sph.point_pos(ipoint))));
+										spac = basis.rspacing(), cell = basis.cell()] GPU_LAMBDA (auto ipoint){
+										 gpu::atomic(pot[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]])
+											 +=	dg.value([spline] GPU_LAMBDA (auto pos) { return spline(pos.length()); }, spac, cell.to_cartesian(sph.point_pos(ipoint)));
 									 });
 				}
 			}
@@ -191,7 +194,7 @@ namespace hamiltonian {
 									chrg = ps.valence_charge(),
 									sp = sep_] GPU_LAMBDA (auto ipoint){
 									 double rr = sph.distance(ipoint);
-									 gpu::atomic::add(&dns[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]], chrg*sp.long_range_density(rr));
+									 gpu::atomic(dns[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]]) += chrg*sp.long_range_density(rr);
 								 });
 			}
 
@@ -271,6 +274,12 @@ namespace hamiltonian {
 
 		////////////////////////////////////////////////////////////////////////////////////
 
+		auto has_overlap() const {
+			return has_overlap_;
+		}
+
+		////////////////////////////////////////////////////////////////////////////////////
+
 		auto has_nlcc() const {
 			return has_nlcc_;
 		}
@@ -306,7 +315,7 @@ namespace hamiltonian {
 									spline = ps.nlcc_density().function()] GPU_LAMBDA (auto ipoint){
 									 auto rr = sph.distance(ipoint);
 									 auto density_val = spline(rr);
-									 gpu::atomic::add(&dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]], density_val);
+									 gpu::atomic(dens[sph.grid_point(ipoint)[0]][sph.grid_point(ipoint)[1]][sph.grid_point(ipoint)[2]]) += density_val;
 								 });
 				
 			}
@@ -352,16 +361,16 @@ namespace hamiltonian {
 														 return vv*grad;
 													 });
 
-				forces[iatom] = basis.volume_element()*basis.cell().metric().to_cartesian(ff);
+				forces[iatom] = basis.volume_element()*basis.cell().to_cartesian(ff);
 			}
 
 			if(basis.comm().size() > 1) {
-				basis.comm().all_reduce_n(reinterpret_cast<double *>(raw_pointer_cast(forces.data_elements())), 3*forces.size());
+				basis.comm().all_reduce_in_place_n(reinterpret_cast<double *>(raw_pointer_cast(forces.data_elements())), 3*forces.size());
 			}
 
 			//we should use allgather here
 			if(comm.size() > 1) {
-				comm.all_reduce_n(reinterpret_cast<double *>(raw_pointer_cast(forces.data_elements())), 3*forces.size());
+				comm.all_reduce_in_place_n(reinterpret_cast<double *>(raw_pointer_cast(forces.data_elements())), 3*forces.size());
 			}
 			
 			return forces;

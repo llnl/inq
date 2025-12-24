@@ -83,8 +83,8 @@ public:
 		
 		if(comm.size() > 1){
 			CALI_CXX_MARK_SCOPE("broyden_extrapolation::reduce");
-			comm.all_reduce_n(raw_pointer_cast(beta.data_elements()), beta.num_elements());
-			comm.all_reduce_n(raw_pointer_cast(work.data_elements()), work.num_elements());
+			comm.all_reduce_in_place_n(raw_pointer_cast(beta.data_elements()), beta.num_elements());
+			comm.all_reduce_in_place_n(raw_pointer_cast(work.data_elements()), work.num_elements());
 		}
 		
 		solvers::least_squares(beta, work);
