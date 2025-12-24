@@ -203,6 +203,11 @@ namespace systems {
 			return (reciprocal_[0]*vv[0] + reciprocal_[1]*vv[1] + reciprocal_[2]*vv[2])*(0.5/M_PI);
 		}
 
+		template <class Type1, class Space1, class Type2, class Space2>
+		GPU_FUNCTION auto distance(vector3<Type1, Space1> const & vv1, vector3<Type2, Space2> const & vv2) const {
+			return length(to_cartesian(vv1) - to_cartesian(vv2));
+		}
+
     bool contains(vector3<double, contravariant> point) const {
 			return point[0] >= -0.5 && point[0] < 0.5 && point[1] >= -0.5 && point[1] < 0.5 && point[2] >= -0.5 && point[2] <= 0.5;
 		}
