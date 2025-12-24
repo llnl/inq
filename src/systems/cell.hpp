@@ -193,25 +193,19 @@ namespace systems {
 			return vv;
 		}
 			
-			template <class Type>
-			GPU_FUNCTION auto to_cartesian(vector3<Type, contravariant> const & vv) const {
-				return lat_[0]*vv[0] + lat_[1]*vv[1] + lat_[2]*vv[2];
-			}
-			
-			template <class Type>
-			GPU_FUNCTION auto to_cartesian(vector3<Type, covariant> const & vv) const {
-				return (rlat_[0]*vv[0] + rlat_[1]*vv[1] + rlat_[2]*vv[2]);
-			}
-			
-			template <class Type, class Space>
-			GPU_FUNCTION auto distance(vector3<Type, Space> const & vv1, vector3<Type, Space> const & vv2) const {
-				return length(to_cartesian(vv1) - to_cartesian(vv2));
-			}
-			
-		};
+		template <class Type>
+		GPU_FUNCTION auto to_cartesian(vector3<Type, contravariant> const & vv) const {
+			return lattice_[0]*vv[0] + lattice_[1]*vv[1] + lattice_[2]*vv[2];
+		}
+		
+		template <class Type>
+		GPU_FUNCTION auto to_cartesian(vector3<Type, covariant> const & vv) const {
+			return (reciprocal_[0]*vv[0] + reciprocal_[1]*vv[1] + reciprocal_[2]*vv[2])*(0.5/M_PI);
+		}
 
-		auto metric() const {
-			return cell_metric{lattice_, reciprocal_};
+		template <class Type1, class Space1, class Type2, class Space2>
+		GPU_FUNCTION auto distance(vector3<Type1, Space1> const & vv1, vector3<Type2, Space2> const & vv2) const {
+			return length(to_cartesian(vv1) - to_cartesian(vv2));
 		}
 
     bool contains(vector3<double, contravariant> point) const {
