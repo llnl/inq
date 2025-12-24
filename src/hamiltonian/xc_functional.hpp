@@ -12,6 +12,7 @@
 #include <stdexcept>
 
 #include <xc.h>
+#include <xc_funcs.h>
 #include <observables/density.hpp>
 #include <operations/gradient.hpp>
 #include <operations/integral.hpp>
