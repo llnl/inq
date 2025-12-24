@@ -153,7 +153,25 @@ public:
 							 });
 		}
 	}
-	
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+	template <typename Occupations>
+	auto mgga_energy(states::orbital_set<basis::real_space, complex> const & phi, Occupations const & occupations, bool const reduce_states = true) const {
+		if(not vmgga_.has_value()) return 0.0;
+
+		CALI_CXX_MARK_FUNCTION;
+		
+		auto gphi = operations::gradient(phi);
+		auto en = gpu::run(gpu::reduce(gphi.local_set_size()), gpu::reduce(gphi.basis().local_size()), 0.0,
+											 [ispin = phi.spin_index(), _gphi = begin(gphi.matrix()), _vmgga = begin(vmgga_->matrix()), _occupations = begin(occupations), cell = phi.basis().cell()] GPU_LAMBDA (auto ist, auto ip) {
+												 return _occupations[ist]*_vmgga[ip][ispin]*cell.norm(_gphi[ip][ist]);
+											 });
+
+		assert(reduce_states == false);
+
+		return phi.basis().volume_element()*en;
+	}
+
 	////////////////////////////////////////////////////////////////////////////////////////////
 
 	auto operator()(const states::orbital_set<basis::real_space, complex> & phi) const {
