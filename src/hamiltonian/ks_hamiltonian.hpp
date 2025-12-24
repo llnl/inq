@@ -156,7 +156,7 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////
 	template <typename Occupations>
-	auto mgga_energy(states::orbital_set<basis::real_space, complex> const & phi, Occupations const & occupations, bool const reduce_states = true) const {
+	double mgga_energy(states::orbital_set<basis::real_space, complex> const & phi, Occupations const & occupations, bool const reduce_states = true) const {
 		if(not vmgga_.has_value()) return 0.0;
 
 		CALI_CXX_MARK_FUNCTION;
