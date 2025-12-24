@@ -83,6 +83,12 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////
+
+	auto requires_kinetic_energy_density() const {
+		return xc_.any_requires_kinetic_energy_density();
+	}
+	
+	////////////////////////////////////////////////////////////////////////////////////////////
 	
 	template <typename HamiltonianType, typename EnergyType, typename FieldType>
 	void update_hamiltonian(HamiltonianType & hamiltonian, EnergyType & energy, FieldType const & spin_density, std::optional<FieldType> const & kinetic_energy_density, double time = 0.0) const {
@@ -135,7 +141,7 @@ public:
 		
 		// XC
 		double exc, nvxc;
-		if(xc_.any_requires_kinetic_energy_density()) {
+		if(requires_kinetic_energy_density()) {
 			assert(kinetic_energy_density.has_value());
 			if(not hamiltonian.vmgga_.has_value()) hamiltonian.vmgga_.emplace(kinetic_energy_density->skeleton());
 		}
