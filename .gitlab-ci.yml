@@ -486,7 +486,7 @@ cuda-mpich-fast-build:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
       - apt purge -y -qq clang clang-14
       - apt autoremove -y -qq
       - nvcc -V
@@ -499,12 +499,12 @@ cuda-mpich-fast-build:
       - rm -fv external_libs/libxc/xc-info external_libs/libxc/xc-threshold
       - rm -fv benchmarks/aluminum benchmarks/fft_benchmark benchmarks/communication
       - cd ../
-      - time tar -Ipixz -cvf cuda-mpich-fast-build.tar.xz build/
+      - time tar -Ilrzip -cvf cuda-mpich-fast-build.tar.lrz build/
       - du -shc build/*
-      - ls -lh cuda-mpich-fast-build.tar.xz
+      - ls -lh cuda-mpich-fast-build.tar.lrz
     artifacts:
       paths:
-      - cuda-mpich-fast-build.tar.xz
+      - cuda-mpich-fast-build.tar.lrz
 
 cuda-mpich-fast-speed:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -514,8 +514,8 @@ cuda-mpich-fast-speed:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-fast-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-fast-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=2
       - cd build      
@@ -529,8 +529,8 @@ cuda-mpich-fast-1proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-fast-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-fast-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=2
       - cd build      
@@ -544,8 +544,8 @@ cuda-mpich-fast-2proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-fast-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-fast-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build      
@@ -559,8 +559,8 @@ cuda-mpich-fast-4proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-fast-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-fast-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build      
@@ -574,8 +574,8 @@ cuda-mpich-fast-5proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-fast-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-fast-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build      
@@ -593,7 +593,7 @@ cuda-mpich-debug-build:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
       - apt purge -y -qq clang clang-14
       - apt autoremove -y -qq
       - nvcc -V
@@ -606,12 +606,12 @@ cuda-mpich-debug-build:
       - rm -fv external_libs/libxc/xc-info external_libs/libxc/xc-threshold
       - rm -fv benchmarks/aluminum benchmarks/fft_benchmark benchmarks/communication      
       - cd ../
-      - time tar -Ipixz -cvf cuda-mpich-debug-build.tar.xz build/
+      - time tar -Ilrzip -cvf cuda-mpich-debug-build.tar.lrz build/
       - du -shc build/*
-      - ls -lh cuda-mpich-debug-build.tar.xz
+      - ls -lh cuda-mpich-debug-build.tar.lrz
     artifacts:
       paths:
-      - cuda-mpich-debug-build.tar.xz
+      - cuda-mpich-debug-build.tar.lrz
 
 cuda-mpich-debug-1proc:
     image: nvcr.io/nvidia/cuda:12.2.2-devel-ubuntu22.04
@@ -621,8 +621,8 @@ cuda-mpich-debug-1proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-debug-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-debug-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=2
       - cd build
@@ -636,8 +636,8 @@ cuda-mpich-debug-2proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-debug-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-debug-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build
@@ -651,8 +651,8 @@ cuda-mpich-debug-3proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-debug-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-debug-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1
       - cd build
@@ -666,8 +666,8 @@ cuda-mpich-debug-4proc:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
-      - time tar -Ipixz -xvf cuda-mpich-debug-build.tar.xz
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - time tar -Ilrzip -xvf cuda-mpich-debug-build.tar.lrz
       - export GPUBIND=`pwd`/scripts/gpubind
       - export CUDA_VISIBLE_DEVICES=0,1      
       - cd build
@@ -684,7 +684,7 @@ nccl-mpich-debug-build:
       - cuda-docker
     script:
       - apt update -qq
-      - apt install --no-install-recommends -y -qq pixz curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
+      - apt install --no-install-recommends -y -qq lrzip curl git ca-certificates ssh g++ gfortran clang make cmake pkg-config libblas-dev liblapack-dev libfftw3-dev libboost-system-dev libboost-serialization-dev libmpich-dev mpich python3 python3-dev ase
       - apt purge -y -qq clang clang-14
       - apt autoremove -y -qq
       - export nccl_dir=`pwd`/build/nccl/
@@ -699,12 +699,12 @@ nccl-mpich-debug-build:
       - time make -j4
       - find -name \*.o | xargs rm -v
       - cd ../
-      - time tar -Ipixz -cvf nccl-mpich-debug-build.tar.xz build/
-      - du -sh build/*
-      - ls -lh nccl-mpich-debug-build.tar.xz
+#      - time tar -Ilrzip -cvf nccl-mpich-debug-build.tar.lrz build/
+#      - du -sh build/*
+#      - ls -lh nccl-mpich-debug-build.tar.lrz
 #    artifacts:
 #      paths:
-#      - nccl-mpich-debug-build.tar.xz
+#      - nccl-mpich-debug-build.tar.lrz
 
 #######################################################################################################################
 
