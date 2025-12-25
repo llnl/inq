@@ -495,9 +495,12 @@ cuda-mpich-fast-build:
       - cmake ../ --install-prefix=$HOME -DCMAKE_BUILD_TYPE=Release -DENABLE_CUDA=yes -DCMAKE_CUDA_ARCHITECTURES="70" -DMPI_EXECUTABLE_SUFFIX=.mpich
       - make -j4
       - find -name \*.o | xargs rm -v
+      - find -name \*.a | xargs rm -v
+      - rm -fv external_libs/libxc/xc-info external_libs/libxc/xc-threshold
+      - rm -fv benchmarks/aluminum benchmarks/fft_benchmark benchmarks/communication
       - cd ../
       - time tar -Ipixz -cvf cuda-mpich-fast-build.tar.xz build/
-      - du -sh build/*
+      - du -shc build/*
       - ls -lh cuda-mpich-fast-build.tar.xz
     artifacts:
       paths:
@@ -598,10 +601,13 @@ cuda-mpich-debug-build:
       - cd build
       - cmake ../ --install-prefix=$HOME -DCMAKE_BUILD_TYPE=Debug -DENABLE_CUDA=yes -DCMAKE_CUDA_ARCHITECTURES="70" -DMPI_EXECUTABLE_SUFFIX=.mpich
       - make -j4
-      - find -name \*.o | xargs rm -v
+      - find -name \*.o | xargs rm -fv
+      - find -name \*.a | xargs rm -fv
+      - rm -fv external_libs/libxc/xc-info external_libs/libxc/xc-threshold
+      - rm -fv benchmarks/aluminum benchmarks/fft_benchmark benchmarks/communication      
       - cd ../
       - time tar -Ipixz -cvf cuda-mpich-debug-build.tar.xz build/
-      - du -sh build/*
+      - du -shc build/*
       - ls -lh cuda-mpich-debug-build.tar.xz
     artifacts:
       paths:
