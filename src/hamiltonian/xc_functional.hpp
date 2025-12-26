@@ -33,7 +33,8 @@ namespace hamiltonian {
 		int id_;
 		int nspin_;
 		xc_func_type func_;
-		
+		bool requires_laplacian_;
+		bool requires_kinetic_energy_density_;
 	public:
 		
 		auto true_functional() const {
@@ -42,14 +43,22 @@ namespace hamiltonian {
 		
 		xc_functional(const int functional_id, int spin_components):
 			id_(functional_id),
-			nspin_(spin_components){
+			nspin_(spin_components),
+			requires_laplacian_(false),
+			requires_kinetic_energy_density_(false) {
 
-			if(true_functional()) assert(nspin_ == 1 or nspin_ == 2);
+			if(not true_functional()) return;
 			
-			if(true_functional() and xc_func_init(&func_, functional_id, (nspin_==1)?XC_UNPOLARIZED:XC_POLARIZED) != 0){
+			assert(nspin_ == 1 or nspin_ == 2);
+			
+			if(xc_func_init(&func_, functional_id, (nspin_==1)?XC_UNPOLARIZED:XC_POLARIZED) != 0){
 				fprintf(stderr, "Functional '%d' not found\n", functional_id);
 				exit(1);
 			}
+
+			auto flags = xc_func_info_get_flags(func_.info);
+			requires_laplacian_              = (flags & XC_FLAGS_NEEDS_LAPLACIAN);
+			requires_kinetic_energy_density_ = (flags & XC_FLAGS_NEEDS_TAU);
 
 		}
 
@@ -90,14 +99,12 @@ namespace hamiltonian {
 			return family() != XC_FAMILY_LDA;
 		}
 
-		auto requires_laplacian() const {
-			if(not true_functional()) return false;
-			return family() == XC_FAMILY_MGGA;
+		auto & requires_laplacian() const {
+			return requires_laplacian_;
 		}
 
-		auto requires_kinetic_energy_density() const {
-			if(not true_functional()) return false;
-			return family() == XC_FAMILY_MGGA;
+		auto & requires_kinetic_energy_density() const {
+			return requires_kinetic_energy_density_;
 		}
 		
 		auto exx_coefficient() const {
@@ -196,36 +203,78 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(ldafunctional.kind_name() == "Exchange");
 		CHECK(ldafunctional.family_name() == "LDA");
 		CHECK(ldafunctional.references() == "[1] P. A. M. Dirac.,  Math. Proc. Cambridge Philos. Soc. 26, 376 (1930)\n[2] F. Bloch.,  Z. Phys. 57, 545 (1929)\n");
+		CHECK(ldafunctional.exx_coefficient() == 0.0);
+		CHECK(ldafunctional.requires_gradient() == false);
+		CHECK(ldafunctional.requires_laplacian() == false);
+		CHECK(ldafunctional.requires_kinetic_energy_density() == false);
 	}
 
 	SECTION("LSDA"){
 		inq::hamiltonian::xc_functional ldafunctional(XC_LDA_X, 2);
 		CHECK(ldafunctional.exx_coefficient() == 0.0);
+		CHECK(ldafunctional.requires_gradient() == false);
+		CHECK(ldafunctional.requires_laplacian() == false);
+		CHECK(ldafunctional.requires_kinetic_energy_density() == false);
 	}
 		
 	SECTION("GGA"){
 		inq::hamiltonian::xc_functional ggafunctional(XC_GGA_X_PBE, 1);
 		CHECK(ggafunctional.exx_coefficient() == 0.0);
 		CHECK(ggafunctional.name() == "Perdew, Burke & Ernzerhof");
+		CHECK(ggafunctional.requires_gradient() == true);
+		CHECK(ggafunctional.requires_laplacian() == false);
+		CHECK(ggafunctional.requires_kinetic_energy_density() == false);
 	}
 
 	SECTION("Spin GGA"){
 		inq::hamiltonian::xc_functional ggafunctional(XC_GGA_X_PBE, 2);
 		CHECK(ggafunctional.exx_coefficient() == 0.0);
 		CHECK(ggafunctional.family_name() == "GGA");
+		CHECK(ggafunctional.requires_gradient() == true);
+		CHECK(ggafunctional.requires_laplacian() == false);
+		CHECK(ggafunctional.requires_kinetic_energy_density() == false);
 	}
 
-	inq::hamiltonian::xc_functional b3lyp(XC_HYB_GGA_XC_B3LYP, 1);
-	inq::hamiltonian::xc_functional pbeh(XC_HYB_GGA_XC_PBEH, 1);
+	SECTION("MGGA with laplacian"){
+		inq::hamiltonian::xc_functional mggafunctional(XC_MGGA_C_SCANL, 1);
+		CHECK(mggafunctional.exx_coefficient() == 0.0);
+		CHECK(mggafunctional.family_name() == "MGGA");
+		CHECK(mggafunctional.requires_gradient() == true);
+		CHECK(mggafunctional.requires_laplacian() == true);
+		CHECK(mggafunctional.requires_kinetic_energy_density() == false);
+	}	
+	
+	SECTION("MGGA with tau"){
+		inq::hamiltonian::xc_functional mggafunctional(XC_MGGA_X_SCAN, 1);
+		CHECK(mggafunctional.exx_coefficient() == 0.0);
+		CHECK(mggafunctional.family_name() == "MGGA");
+		CHECK(mggafunctional.requires_gradient() == true);
+		CHECK(mggafunctional.requires_laplacian() == false);
+		CHECK(mggafunctional.requires_kinetic_energy_density() == true);
+	}
+
+	SECTION("MGGA with tau and laplacian"){
+		inq::hamiltonian::xc_functional mggafunctional(XC_MGGA_X_TB09, 1);
+		CHECK(mggafunctional.exx_coefficient() == 0.0);
+		CHECK(mggafunctional.family_name() == "MGGA");
+		CHECK(mggafunctional.requires_gradient() == true);
+		CHECK(mggafunctional.requires_laplacian() == true);
+		CHECK(mggafunctional.requires_kinetic_energy_density() == true);
+	}
 	
 	SECTION("HYBRIDS"){
+		inq::hamiltonian::xc_functional b3lyp(XC_HYB_GGA_XC_B3LYP, 1);
+		inq::hamiltonian::xc_functional pbeh(XC_HYB_GGA_XC_PBEH, 1);
+	
 		CHECK(b3lyp.exx_coefficient() == 0.2_a);
 		CHECK(b3lyp.kind_name() == "Exchange-correlation");
 		CHECK(b3lyp.family_name() == "GGA");
+		CHECK(b3lyp.requires_gradient() == true);
+		CHECK(b3lyp.requires_laplacian() == false);
+		CHECK(b3lyp.requires_kinetic_energy_density() == false);
+		
 		CHECK(pbeh.exx_coefficient() == 0.25_a);
-	}
 
-	SECTION("COPY AND ASSIGNMENT"){
 		auto copy = b3lyp;
 		CHECK(copy.exx_coefficient() == 0.2_a);
 
