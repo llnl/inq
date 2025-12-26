@@ -19,27 +19,41 @@
 namespace inq {
 namespace observables {
 
-basis::field<basis::real_space, double> kinetic_energy_density(systems::electrons const & electrons){
+basis::field_set<basis::real_space, double> kinetic_energy_density(systems::electrons const & electrons){
 
 	CALI_CXX_MARK_FUNCTION;
 
-	basis::field<basis::real_space, double> density(electrons.states_basis());
+	basis::field_set<basis::real_space, double> density(electrons.states_basis(), electrons.states().num_density_components());
 
 	density.fill(0.0);
 
 	auto iphi = 0;
 	for(auto & phi : electrons.kpin()){
 		auto gphi = operations::gradient(phi, /*factor = */ 1.0, /* shift = */ phi.kpoint());
-		
-		gpu::run(density.basis().part().local_size(),
-						 [nst = gphi.set_part().local_size(),
-							occ = begin(electrons.occupations()[iphi]),
-							gph = begin(gphi.matrix()),
-							den = begin(density.linear()),
-							cell = density.basis().cell()]
-						 GPU_LAMBDA (auto ipoint){
-							 for(int ist = 0; ist < nst; ist++) den[ipoint] += 0.5*occ[ist]*cell.norm(gph[ipoint][ist]);
-						 });
+
+		if(not phi.spinors()){
+			
+			gpu::run(density.basis().part().local_size(),
+							 [nst = gphi.set_part().local_size(), occ = begin(electrons.occupations()[iphi]), gph = begin(gphi.matrix()),
+								den = begin(density.matrix()), cell = density.basis().cell(), ispin = phi.spin_index()] GPU_LAMBDA (auto ipoint){
+								 for(int ist = 0; ist < nst; ist++) den[ipoint][ispin] += 0.5*occ[ist]*cell.norm(gph[ipoint][ist]);
+							 });
+
+		} else {
+			
+			gpu::run(density.basis().part().local_size(),
+							 [nst = gphi.local_spinor_set_size(), occ = begin(electrons.occupations()[iphi]), gph = begin(gphi.spinor_array()),
+								den = begin(density.matrix()), cell = density.basis().cell()] GPU_LAMBDA (auto ipoint){
+								 for(int ist = 0; ist < nst; ist++) {
+									 den[ipoint][0] += 0.5*occ[ist]*cell.norm(gph[ipoint][0][ist]);
+									 den[ipoint][1] += 0.5*occ[ist]*cell.norm(gph[ipoint][1][ist]);
+									 auto crossterm = 0.5*occ[ist]*cell.dot(gph[ipoint][0][ist], gph[ipoint][1][ist]);
+									 den[ipoint][2] += real(crossterm);
+									 den[ipoint][3] += imag(crossterm);
+								 }
+							 });
+			
+		}
 
 		iphi++;
 	}

@@ -27,6 +27,7 @@ namespace hamiltonian {
 		double hartree_ = 0.0;
 		double xc_ = 0.0;
 		double nvxc_ = 0.0;
+		double mgga_ = 0.0;
 		double exact_exchange_ = 0.0;
 		double zeeman_ener_ = 0.0;
 
@@ -69,6 +70,7 @@ public:
 			eigenvalues_ = 0.0;
 			non_local_ = 0.0;
 			exact_exchange_ = 0.0;
+			mgga_ = 0.0;
 			
 			int iphi = 0;
 			for(auto & phi : el.kpin()){
@@ -95,18 +97,21 @@ public:
 					exact_exchange_ += 0.5*occ_sum(el.occupations()[iphi], exchange_me);
 				}
 
+				mgga_ += ham.mgga_energy(phi, el.occupations()[iphi], /*reduce_states = */ false);
+				
 				iphi++;
 			}
 
 			if(el.kpin_states_comm().size() > 1){	
 				CALI_CXX_MARK_SCOPE("energy::calculate::reduce");
 
-				double red[4] = {kinetic_, eigenvalues_, non_local_, exact_exchange_};
-				el.kpin_states_comm().all_reduce_in_place_n(red, 4);
+				double red[5] = {kinetic_, eigenvalues_, non_local_, exact_exchange_, mgga_};
+				el.kpin_states_comm().all_reduce_in_place_n(red, 5);
 				kinetic_         = red[0];
 				eigenvalues_     = red[1];
 				non_local_       = red[2];
 				exact_exchange_  = red[3];
+				mgga_            = red[4];
 			}
 
 			return normres;
@@ -164,6 +169,14 @@ public:
 			xc_ = val;
 		}
 
+		auto & mgga() const {
+			return mgga_;
+		}
+
+		void mgga(double const & val) {
+			mgga_ = val;
+		}
+
 		auto & nvxc() const {
 			return nvxc_;
 		}
@@ -216,6 +229,7 @@ public:
 			utils::save_value(comm, dirname + "/non-local",      non_local_,      error_message);
 			utils::save_value(comm, dirname + "/hartree",        hartree_,     error_message);
 			utils::save_value(comm, dirname + "/xc",             xc_,          error_message);
+			utils::save_value(comm, dirname + "/mgga",           mgga_,           error_message);
 			utils::save_value(comm, dirname + "/nvxc",           nvxc_,        error_message);
 			utils::save_value(comm, dirname + "/exact_exchange", exact_exchange_, error_message);
 			utils::save_value(comm, dirname + "/zeeman_energy",  zeeman_ener_,    error_message);
@@ -233,6 +247,7 @@ public:
 			utils::load_value(dirname + "/non-local",       en.non_local_,      error_message);
 			utils::load_value(dirname + "/hartree",         en.hartree_,        error_message);
 			utils::load_value(dirname + "/xc",              en.xc_,             error_message);
+			utils::load_value(dirname + "/mgga",            en.mgga_,           error_message);
 			utils::load_value(dirname + "/nvxc",            en.nvxc_,           error_message);
 			utils::load_value(dirname + "/exact_exchange",  en.exact_exchange_, error_message);
 			utils::load_value(dirname + "/zeeman_energy",   en.zeeman_ener_,    error_message);
@@ -251,6 +266,7 @@ public:
 			tfm::format(out, "  external       = %20.12f Ha\n", self.external());
 			tfm::format(out, "  non-local      = %20.12f Ha\n", self.non_local());
 			tfm::format(out, "  xc             = %20.12f Ha\n", self.xc());
+			tfm::format(out, "  mgga           = %20.12f Ha\n", self.mgga());
 			tfm::format(out, "  nvxc           = %20.12f Ha\n", self.nvxc());
 			tfm::format(out, "  exact-exchange = %20.12f Ha\n", self.exact_exchange());
 			tfm::format(out, "  ion            = %20.12f Ha\n", self.ion());
@@ -289,6 +305,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	en.non_local(5.0);
 	en.hartree(6.0);
 	en.xc(7.0);
+	en.mgga(7.7);
 	en.nvxc(8.0);
 	en.exact_exchange(10.0);
 
@@ -300,6 +317,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	CHECK(en.non_local() == 5.0);
 	CHECK(en.hartree() == 6.0);
 	CHECK(en.xc() == 7.0);
+	CHECK(en.mgga() == 7.7);
 	CHECK(en.nvxc() == 8.0);
 	CHECK(en.exact_exchange() == 10.0);
 	
@@ -314,6 +332,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 	CHECK(read_en.non_local() == 5.0);
 	CHECK(read_en.hartree() == 6.0);
 	CHECK(read_en.xc() == 7.0);
+	CHECK(read_en.mgga() == 7.7);
 	CHECK(read_en.nvxc() == 8.0);
 	CHECK(read_en.exact_exchange() == 10.0);
 	

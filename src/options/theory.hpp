@@ -101,6 +101,22 @@ public:
 		return inter;
 	}
 
+	auto scan()  const {
+		theory inter = *this;
+		inter.hartree_potential_ = true;
+		inter.exchange_ = XC_MGGA_X_SCAN;
+		inter.correlation_ = XC_MGGA_C_SCAN;
+		return inter;
+	}
+
+	auto scanl()  const {
+		theory inter = *this;
+		inter.hartree_potential_ = true;
+		inter.exchange_ = XC_MGGA_X_SCANL;
+		inter.correlation_ = XC_MGGA_C_SCANL;
+		return inter;
+	}
+	
 	auto exchange_coefficient() const {
 		if(exchange() == XC_HARTREE_FOCK) return 1.0;
 		if(exchange() == XC_NONE) return 0.0;

@@ -62,7 +62,11 @@ FieldSetType laplacian(FieldSetType const & ff, FactorType factor = 1.0, vector3
 	CALI_CXX_MARK_FUNCTION;
 
 	if constexpr(std::is_same_v<typename FieldSetType::basis_type, basis::real_space>) {
-		return operations::transform::to_real(operations::laplacian(operations::transform::to_fourier(ff), factor));		
+		if constexpr(std::is_same_v<typename FieldSetType::element_type, double>) {
+			return real_field(operations::transform::to_real(operations::laplacian(operations::transform::to_fourier(complex_field(ff)), factor)));
+		} else {
+			return operations::transform::to_real(operations::laplacian(operations::transform::to_fourier(ff), factor));
+		}
 	} else {
 		
 		static_assert(std::is_same_v<typename FieldSetType::basis_type, basis::fourier_space>, "Only implemented for real or fourier_space");

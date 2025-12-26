@@ -54,7 +54,7 @@ int main(int argc, char ** argv){
 
 		auto ked = observables::kinetic_energy_density(electrons);
 		
-		energy_match.check("kinetic energy", operations::integral(ked), 11.423986855221);
+		energy_match.check("kinetic energy", operations::integral_sum(ked), 11.423986855221);
 	}
 	
 	fftw_cleanup();

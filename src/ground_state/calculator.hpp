@@ -26,6 +26,7 @@
 #include <operations/integral.hpp>
 #include <observables/density.hpp>
 #include <observables/forces_stress.hpp>
+#include <observables/kinetic_energy_density.hpp>
 #include <parallel/gather.hpp>
 #include <mixers/linear.hpp>
 #include <mixers/broyden.hpp>
@@ -123,9 +124,12 @@ public:
 		}();
 		
 		auto old_energy = std::numeric_limits<double>::max();
-		
+
+		auto ked = std::optional<decltype(observables::kinetic_energy_density(electrons))>{};
+
+		if(sc_.requires_kinetic_energy_density()) ked.emplace(observables::kinetic_energy_density(electrons));
 		sc_.update_ionic_fields(electrons.states_comm(), ions_, electrons.atomic_pot());
-		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density());
+		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density(), ked);
 		
 		res.energy.ion(ionic::interaction_energy(ions_.cell(), ions_, electrons.atomic_pot()));
 		
@@ -190,7 +194,8 @@ public:
 				}
 			}
 			
-			sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density());
+			if(sc_.requires_kinetic_energy_density()) ked.emplace(observables::kinetic_energy_density(electrons));
+			sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density(), ked);
 			
 			CALI_MARK_END("mixing");
 			
@@ -232,9 +237,10 @@ public:
 			throw std::runtime_error("The SCF calculation did not converge. Try reducing the mixing parameter.\n"); 
 		}
 		
-		//make sure we have a density consistent with phi
+		//make sure we have a density fully consistent with phi
 		electrons.spin_density() = observables::density::calculate(electrons);
-		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density());
+		if(sc_.requires_kinetic_energy_density()) ked.emplace(observables::kinetic_energy_density(electrons));
+		sc_.update_hamiltonian(ham_, res.energy, electrons.spin_density(), ked);
 		auto normres = res.energy.calculate(ham_, electrons);
 			
 		if(solver_.calc_forces()) {

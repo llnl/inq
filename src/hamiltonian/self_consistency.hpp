@@ -83,9 +83,15 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////
+
+	auto requires_kinetic_energy_density() const {
+		return xc_.any_requires_kinetic_energy_density();
+	}
+	
+	////////////////////////////////////////////////////////////////////////////////////////////
 	
 	template <typename HamiltonianType, typename EnergyType, typename FieldType>
-	void update_hamiltonian(HamiltonianType & hamiltonian, EnergyType & energy, FieldType const & spin_density, double time = 0.0) const {
+	void update_hamiltonian(HamiltonianType & hamiltonian, EnergyType & energy, FieldType const & spin_density, std::optional<FieldType> const & kinetic_energy_density, double time = 0.0) const {
 
 		CALI_CXX_MARK_FUNCTION;
 
@@ -135,15 +141,20 @@ public:
 		
 		// XC
 		double exc, nvxc;
-		hamiltonian.vxc_ = xc_(spin_density, core_density_, exc, nvxc);
+		if(requires_kinetic_energy_density()) {
+			assert(kinetic_energy_density.has_value());
+			if(not hamiltonian.vmgga_.has_value()) hamiltonian.vmgga_.emplace(kinetic_energy_density->skeleton());
+		}
 
+		xc_(spin_density, core_density_, kinetic_energy_density, hamiltonian.vxc_, hamiltonian.vmgga_, exc, nvxc);
+		
 		assert(hamiltonian.vxc_.set_size() == vks.set_size());
 		
 		gpu::run(hamiltonian.vxc_.local_set_size(), hamiltonian.vxc_.basis().local_size(),
 						 [vx = begin(hamiltonian.vxc_.matrix()), vk = begin(vks.matrix())] GPU_LAMBDA (auto is, auto ip){
 							 vk[ip][is] += vx[ip][is];
 						 });
-
+		
 		energy.xc(exc);
 		energy.nvxc(nvxc);
 
@@ -178,6 +189,13 @@ public:
 			energy.zeeman_energy(zeeman_ener);
 		}
 		
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////
+	
+	template <typename HamiltonianType, typename EnergyType, typename FieldType>
+	void update_hamiltonian(HamiltonianType & hamiltonian, EnergyType & energy, FieldType const & spin_density, double time = 0.0) const {
+		update_hamiltonian(hamiltonian, energy, spin_density, std::optional<FieldType>{}, time);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////
