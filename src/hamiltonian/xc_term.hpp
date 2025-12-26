@@ -127,7 +127,7 @@ public:
 	
   template <typename SpinDensity, typename CoreDensity, typename KineticEnergyDensity>
   void operator()(SpinDensity const & spin_density, CoreDensity const & core_density, KineticEnergyDensity const & kinetic_energy_density,
-									basis::field_set<basis::real_space, double> & vxc, std::optional<basis::field_set<basis::real_space, double>> & vtau, double & exc, double & nvxc) const {
+									basis::field_set<basis::real_space, double> & vxc, std::optional<basis::field_set<basis::real_space, double>> & vmgga, double & exc, double & nvxc) const {
 
 		vxc.fill(0.0);
 		exc = 0.0;
@@ -148,15 +148,29 @@ public:
 
 		if(any_requires_kinetic_energy_density()) {
 			assert(kinetic_energy_density.has_value());
-			assert(vtau.has_value());
+			assert(vmgga.has_value());
+			vmgga->fill(0.0);
 		}
-		
+
 		for(auto & func : functionals_){
 			if(not func.true_functional()) continue;
 
+			auto vtau = std::optional<basis::field_set<basis::real_space, double>>{};
+
+			if(func.requires_kinetic_energy_density()) {
+				vtau.emplace(kinetic_energy_density->skeleton());
+			}
+			
 			evaluate_functional(func, full_density, density_gradient, density_laplacian, kinetic_energy_density, efunc, vfunc, vtau);
 			compute_vxc(spin_density, vfunc, vxc);
-
+			
+			if(func.requires_kinetic_energy_density()) {
+				gpu::run(vtau->local_set_size(), vtau->basis().local_size(),
+								 [_vtau = begin(vtau->matrix()), _vmgga = begin(vmgga->matrix())] GPU_LAMBDA (auto ist, auto ip) {
+									 _vmgga[ip][ist] += _vtau[ip][ist];
+								 });
+			}
+			
 			exc += efunc;
 		}
 
