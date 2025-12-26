@@ -29,8 +29,12 @@
 namespace inq {
 namespace hamiltonian {
 	class xc_functional {
-
-		public:
+		
+		int id_;
+		int nspin_;
+		xc_func_type func_;
+		
+	public:
 		
 		auto true_functional() const {
 			return id_ > 0;			
@@ -46,6 +50,7 @@ namespace hamiltonian {
 				fprintf(stderr, "Functional '%d' not found\n", functional_id);
 				exit(1);
 			}
+
 		}
 
 		xc_functional(xc_functional const & other):
@@ -165,12 +170,7 @@ namespace hamiltonian {
 		auto & nspin() const {
 			return nspin_;
 		}
-		
-	private:
-		
-		int id_;
-		int nspin_;
-		xc_func_type func_;
+
 	};
 
 }
