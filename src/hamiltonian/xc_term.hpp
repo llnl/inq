@@ -201,7 +201,7 @@ public:
 
 	template <typename Density, typename DensityGradient, typename DensityLaplacian, typename KineticEnergyDensity>
 	static void evaluate_functional(hamiltonian::xc_functional const & functional,
-																	Density const & density, DensityGradient const & density_gradient, DensityLaplacian const & density_laplacian, KineticEnergyDensity const & kinetic_energy_density,
+																	Density const & density, DensityGradient const & gradient, DensityLaplacian const & laplacian, KineticEnergyDensity const & kinetic_energy_density,
 																	double & efunctional, basis::field_set<basis::real_space, double> & vfunctional, std::optional<basis::field_set<basis::real_space, double>> & vtau){
 		CALI_CXX_MARK_FUNCTION;
 
@@ -209,102 +209,108 @@ public:
 
 		assert(functional.nspin() == density.set_size());
 
-		if(functional.family() == XC_FAMILY_LDA){
-			xc_lda_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(), raw_pointer_cast(density.matrix().data_elements()),
-										 edens.data(), raw_pointer_cast(vfunctional.matrix().data_elements()));
-			gpu::sync();
-			
-		} else if(functional.family() == XC_FAMILY_GGA){
+		auto nsigma = (density.set_size() > 1) ? 3:1;
+		std::optional<basis::field_set<basis::real_space, double>> sigma;
+		std::optional<basis::field_set<basis::real_space, double>> vsigma;
+		std::optional<basis::field_set<basis::real_space, double>> vlapl;
 
-			auto nsig = (density.set_size() > 1) ? 3:1;
-			
-			basis::field_set<basis::real_space, double> sig(density.basis(), nsig);
-			basis::field_set<basis::real_space, double> vsig(sig.skeleton());
-
-			gpu::run(density.basis().local_size(),
-							 [gr = begin(density_gradient->matrix()), si = begin(sig.matrix()), cell = density.basis().cell(), nsig] GPU_LAMBDA (auto ip){
-								 si[ip][0] = cell.norm(gr[ip][0]);
-								 if(nsig > 1) si[ip][1] = cell.dot(gr[ip][0], gr[ip][1]);
-								 if(nsig > 1) si[ip][2] = cell.norm(gr[ip][1]);
-							 });
-
-			xc_gga_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(), raw_pointer_cast(density.matrix().data_elements()), raw_pointer_cast(sig.matrix().data_elements()),
-										 edens.data(), raw_pointer_cast(vfunctional.matrix().data_elements()), raw_pointer_cast(vsig.matrix().data_elements()));
-			gpu::sync();
-
-			basis::field_set<basis::real_space, vector3<double, covariant>> term(vfunctional.skeleton());
+		double const * lapl_ptr  = NULL;
+		double const * tau_ptr   = NULL;
+		double * vlapl_ptr = NULL;
+		double * vtau_ptr  = NULL;
+		
+		if(functional.requires_gradient()) {
+			assert(gradient.has_value());
+						
+			sigma.emplace(density.basis(), nsigma);
+			vsigma.emplace(density.basis(), nsigma);
 
 			gpu::run(density.basis().local_size(),
-							 [vs = begin(vsig.matrix()), gr = begin(density_gradient->matrix()), te = begin(term.matrix()), nsig] GPU_LAMBDA (auto ip){
-								 if(nsig == 1) te[ip][0] = -2.0*vs[ip][0]*gr[ip][0];
-								 if(nsig == 3) te[ip][0] = -2.0*vs[ip][0]*gr[ip][0] - vs[ip][1]*gr[ip][1];
-								 if(nsig == 3) te[ip][1] = -2.0*vs[ip][2]*gr[ip][1] - vs[ip][1]*gr[ip][0];
+							 [_gradient = begin(gradient->matrix()), _sigma = begin(sigma->matrix()), cell = density.basis().cell(), nsigma] GPU_LAMBDA (auto ip){
+								 _sigma[ip][0] = cell.norm(_gradient[ip][0]);
+								 if(nsigma > 1) _sigma[ip][1] = cell.dot(_gradient[ip][0], _gradient[ip][1]);
+								 if(nsigma > 1) _sigma[ip][2] = cell.norm(_gradient[ip][1]);
 							 });
+		}
 
-			auto div_term = operations::divergence(term);
-
-			assert(vfunctional.local_set_size() == div_term.local_set_size());
-
-			gpu::run(vfunctional.local_set_size(), vfunctional.basis().local_size(),
-							 [di = begin(div_term.matrix()), vf = begin(vfunctional.matrix())] GPU_LAMBDA (auto ispin, auto ip){
-								 vf[ip][ispin] += di[ip][ispin];
-							 });
-
-		} else if(functional.family() == XC_FAMILY_MGGA){
+		if(functional.requires_laplacian()) {
+			assert(laplacian.has_value());
 			
-			//FOR THE MOMENT THIS DUPLICATES A LOT OF CODE FROM GGA, THEY SHOULD BE CONSOLIDATED
+			vlapl.emplace(laplacian->skeleton());
+			
+			lapl_ptr  = laplacian->data();
+			vlapl_ptr = vlapl->data();
+		}
 
+		if(functional.requires_kinetic_energy_density()) {
 			assert(kinetic_energy_density.has_value());
 			assert(vtau.has_value());
-			assert(kinetic_energy_density->set_size() != 4); //non-collinear is not implemented yet
+
+			tau_ptr = kinetic_energy_density->data();
+			vtau_ptr = vtau->data();
+		}
+		
+		//call libxc
+		if(functional.family() == XC_FAMILY_LDA){
 			
-			auto nsigma = (density.set_size() > 1) ? 3:1;
-			
-			basis::field_set<basis::real_space, double> sigma(density.basis(), nsigma);
-			basis::field_set<basis::real_space, double> vsigma(sigma.skeleton());
-			basis::field_set<basis::real_space, double> vlapl(density_laplacian->skeleton());
-			
-			gpu::run(density.basis().local_size(),
-							 [gr = begin(density_gradient->matrix()), si = begin(sigma.matrix()), cell = density.basis().cell(), nsigma] GPU_LAMBDA (auto ip){
-								 si[ip][0] = cell.norm(gr[ip][0]);
-								 if(nsigma > 1) si[ip][1] = cell.dot(gr[ip][0], gr[ip][1]);
-								 if(nsigma > 1) si[ip][2] = cell.norm(gr[ip][1]);
-							 });
+			xc_lda_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(),
+										 density.data(),
+										 edens.data(), vfunctional.data());
+
+		} else if(functional.family() == XC_FAMILY_GGA){
+
+			xc_gga_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(),
+										 density.data(), sigma->data(),
+										 edens.data(), vfunctional.data(), vsigma->data());
+
+		} else if(functional.family() == XC_FAMILY_MGGA){
 
 			xc_mgga_exc_vxc(functional.libxc_func_ptr(), density.basis().local_size(),
-											raw_pointer_cast(density.matrix().data_elements()), raw_pointer_cast(sigma.matrix().data_elements()),
-											raw_pointer_cast(density_laplacian->matrix().data_elements()), raw_pointer_cast(kinetic_energy_density->matrix().data_elements()),
-											edens.data(),
-											raw_pointer_cast(vfunctional.matrix().data_elements()), raw_pointer_cast(vsigma.matrix().data_elements()),	
-											raw_pointer_cast(vlapl.matrix().data_elements()), raw_pointer_cast(vtau->matrix().data_elements()));
-			gpu::sync();
-
-			basis::field_set<basis::real_space, vector3<double, covariant>> term(vfunctional.skeleton());
-
-			gpu::run(density.basis().local_size(),
-							 [vs = begin(vsigma.matrix()), gr = begin(density_gradient->matrix()), te = begin(term.matrix()), nsigma] GPU_LAMBDA (auto ip){
-								 if(nsigma == 1) te[ip][0] = -2.0*vs[ip][0]*gr[ip][0];
-								 if(nsigma == 3) te[ip][0] = -2.0*vs[ip][0]*gr[ip][0] - vs[ip][1]*gr[ip][1];
-								 if(nsigma == 3) te[ip][1] = -2.0*vs[ip][2]*gr[ip][1] - vs[ip][1]*gr[ip][0];
-							 });
-
-			auto div_term = operations::divergence(term);
-			auto lapl_vlapl = operations::laplacian(vlapl);
-
-			assert(vfunctional.local_set_size() == div_term.local_set_size());
-			assert(vfunctional.local_set_size() == lapl_vlapl.local_set_size());
-			
-			gpu::run(vfunctional.local_set_size(), vfunctional.basis().local_size(),
-							 [di = begin(div_term.matrix()), vf = begin(vfunctional.matrix()), la = begin(lapl_vlapl.matrix())] GPU_LAMBDA (auto ispin, auto ip){
-								 vf[ip][ispin] += di[ip][ispin] + la[ip][ispin];
-							 });
-
+											density.data(), sigma->data(), lapl_ptr, tau_ptr,
+											edens.data(), vfunctional.data(), vsigma->data(), vlapl_ptr, vtau_ptr);
 			
 		} else {
 			throw std::runtime_error("inq error: unsupported exchange correlation functional type");
 		}
 		
+		gpu::sync();
+
 		efunctional = operations::integral_product(edens, observables::density::total(density));
+		
+		if(functional.requires_gradient()) {
+			assert(vsigma.has_value());
+			
+			basis::field_set<basis::real_space, vector3<double, covariant>> term(vfunctional.skeleton());
+
+			gpu::run(density.basis().local_size(),
+							 [_vsigma = begin(vsigma->matrix()), _gradient = begin(gradient->matrix()), _term = begin(term.matrix()), nsigma] GPU_LAMBDA (auto ip){
+								 if(nsigma == 1) _term[ip][0] = -2.0*_vsigma[ip][0]*_gradient[ip][0];
+								 if(nsigma == 3) _term[ip][0] = -2.0*_vsigma[ip][0]*_gradient[ip][0] - _vsigma[ip][1]*_gradient[ip][1];
+								 if(nsigma == 3) _term[ip][1] = -2.0*_vsigma[ip][2]*_gradient[ip][1] - _vsigma[ip][1]*_gradient[ip][0];
+							 });
+			
+			auto div_term = operations::divergence(term);
+			
+			assert(vfunctional.local_set_size() == div_term.local_set_size());
+			
+			gpu::run(vfunctional.local_set_size(), vfunctional.basis().local_size(),
+							 [_div_term = begin(div_term.matrix()), _vfunctional = begin(vfunctional.matrix())] GPU_LAMBDA (auto ispin, auto ip){
+								 _vfunctional[ip][ispin] += _div_term[ip][ispin];
+							 });
+		}
+
+		if(functional.requires_laplacian()) {
+			assert(vlapl.has_value());
+	
+			auto lapl_vlapl = operations::laplacian(*vlapl);
+			
+			assert(vfunctional.local_set_size() == lapl_vlapl.local_set_size());
+			
+			gpu::run(vfunctional.local_set_size(), vfunctional.basis().local_size(),
+							 [_lapl_vlapl = begin(lapl_vlapl.matrix()), _vfunctional = begin(vfunctional.matrix())] GPU_LAMBDA (auto ispin, auto ip){
+								 _vfunctional[ip][ispin] += _lapl_vlapl[ip][ispin];
+							 });
+		}
 		
 	}
 	
@@ -537,34 +543,24 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			hamiltonian::xc_term::evaluate_functional(func_unp, density_unp, grad_unp, lapl_unp, ked_unp, efunc_unp, vfunc_unp, vtau_unp);
 			hamiltonian::xc_term::evaluate_functional(func_pol, density_pol, grad_pol, lapl_pol, ked_pol, efunc_pol, vfunc_pol, vtau_pol);
 			
-			CHECK(efunc_unp == -15.5229465822_a);
-			CHECK(efunc_pol == -16.5543212526_a);
+			CHECK(efunc_unp == -15.5163831402_a);
+			CHECK(efunc_pol == -16.5501447127_a);
 		
 			if(contains1) {
-				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.1414100307_a);
+				CHECK(vfunc_unp.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.2603448155_a);
 			
-				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] ==  0.1509734221_a);
-				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.1660845089_a);
-
-				CHECK(vtau_unp->hypercubic()[p1[0]][p1[1]][p1[2]][0] == 0.0_a);
-								
-				CHECK(vtau_pol->hypercubic()[p1[0]][p1[1]][p1[2]][0] == 0.0_a);
-				CHECK(vtau_pol->hypercubic()[p1[0]][p1[1]][p1[2]][1] == 0.0_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][0] == -0.2440324029_a);
+				CHECK(vfunc_pol.hypercubic()[p1[0]][p1[1]][p1[2]][1] == -0.2426359008_a);
 			}
 
 			if(contains2) {
-				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -1.640235861_a);
+				CHECK(vfunc_unp.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.5444471018_a);
 			
-				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -1.4554176279_a);
-				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -2.4222974495_a);
-
-				CHECK(vtau_unp->hypercubic()[p2[0]][p2[1]][p2[2]][0] == 0.0_a);
-								
-				CHECK(vtau_pol->hypercubic()[p2[0]][p2[1]][p2[2]][0] == 0.0_a);
-				CHECK(vtau_pol->hypercubic()[p2[0]][p2[1]][p2[2]][1] == 0.0_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][0] == -0.6290754320_a);
+				CHECK(vfunc_pol.hypercubic()[p2[0]][p2[1]][p2[2]][1] == -0.4802885076_a);
 			}
 		}
-		
+
 		//SCAN C
 		{
 		
@@ -627,9 +623,15 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 		CHECK(pbe.any_requires_kinetic_energy_density() == false);
 		CHECK(pbe.any_true_functional()                 == true);
 
+		auto scanl = hamiltonian::xc_term(options::theory{}.scanl(), 1);
+		CHECK(scanl.any_requires_gradient()               == true);
+		CHECK(scanl.any_requires_laplacian()              == true);
+		CHECK(scanl.any_requires_kinetic_energy_density() == false);
+		CHECK(scanl.any_true_functional()                 == true);
+		
 		auto scan = hamiltonian::xc_term(options::theory{}.scan(), 1);
 		CHECK(scan.any_requires_gradient()               == true);
-		CHECK(scan.any_requires_laplacian()              == true);
+		CHECK(scan.any_requires_laplacian()              == false);
 		CHECK(scan.any_requires_kinetic_energy_density() == true);
 		CHECK(scan.any_true_functional()                 == true);
 
