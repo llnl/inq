@@ -39,14 +39,28 @@ namespace utils {
       if(diff > tol){
 				
         fmt::print(std::cout, "\nMatch '{}': FAILED\n", match_name);
-        fmt::print(std::cout, "  calculated value = {:.12f}\n", value);
-        fmt::print(std::cout, "  reference value  = {:.12f}\n", reference);
-        fmt::print(std::cout, "  difference       = {:.1e}\n", diff);
+				if constexpr(std::is_same_v<Type, double>) {
+					fmt::print(std::cout, "  calculated value = {:.12f}\n", value);
+					fmt::print(std::cout, "  reference value  = {:.12f}\n", reference);
+				} else  if constexpr(std::is_same_v<Type, vector3<double>>) {
+					fmt::print(std::cout, "  calculated value = {{{:.12f}, {:.12f}, {:.12f}}}\n", value[0], value[1], value[2]);
+					fmt::print(std::cout, "  reference value  = {{{:.12f}, {:.12f}, {:.12f}}}\n", reference[0], reference[1], reference[2]);
+				} else {
+					fmt::print(std::cout, "  calculated value = {}\n", value);
+					fmt::print(std::cout, "  reference value  = {}\n", reference);
+				}
+				fmt::print(std::cout, "  difference       = {:.1e}\n", diff);
 				fmt::print(std::cout, "  tolerance        = {:.1e}\n\n", tol);
         ok_ = false;
         return false;
       } else {
-        fmt::print(std::cout, "Match '{}': SUCCESS (value = {:.12f} , diff = {:.1e})\n", match_name, value, diff);
+				if constexpr(std::is_same_v<Type, double>) {
+					fmt::print(std::cout, "Match '{}': SUCCESS (value = {:.12f} , diff = {:.1e})\n", match_name, value, diff);
+				} else if constexpr(std::is_same_v<Type, vector3<double>>) {
+					fmt::print(std::cout, "Match '{}': SUCCESS (value = {{{:.12f}, {:.12f}, {:.12f}}}, diff = {:.1e})\n", match_name, value[0], value[1], value[2], diff);
+				} else {
+					fmt::print(std::cout, "Match '{}': SUCCESS (value = {} , diff = {:.1e})\n", match_name, value, diff);
+				}
         return true;
       }
     }
