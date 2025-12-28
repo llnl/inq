@@ -122,7 +122,7 @@ public:
 
 			auto kpoint = self.electrons_.brillouin_zone().kpoint(self.all_kpoint_index[ieig])/(2.0*M_PI);
 			
-			if(self.nkpoints_ > 1) fmt::print(out, "  kpt = ({:5.2f},{:5.2f},{:5.2f})", kpoint[0], kpoint[1], kpoint[2]);
+			if(self.nkpoints_ > 1) fmt::print(out, "  kpt = {{{:5.2f},{:5.2f},{:5.2f}}}", kpoint[0], kpoint[1], kpoint[2]);
 			if(self.nspin_    > 1) fmt::print(out, "  spin = {}", spin_string(self.all_spin_index[ieig]));
 			fmt::print(out, "  st = {:4d}  occ = {:4.3f}  evalue = {:18.12f}  res = {:5.0e}\n",
 									self.all_states_index[ieig] + 1, self.all_occupations[ieig], real(self.all_eigenvalues[ieig]), fabs(self.all_normres[ieig]));
@@ -154,7 +154,7 @@ public:
 
 					auto kpoint = self.electrons_.brillouin_zone().kpoint(self.all_kpoint_index[ieig])/(2.0*M_PI);
 
-					if(self.nkpoints_ > 1) fmt::print(out, "  kpt = (:5.2f},{:5.2f},{:5.2f})", kpoint[0], kpoint[1], kpoint[2]);
+					if(self.nkpoints_ > 1) fmt::print(out, "  kpt = {{{:5.2f},{:5.2f},{:5.2f}}}", kpoint[0], kpoint[1], kpoint[2]);
 					if(self.nspin_    > 1) fmt::print(out, "  spin = {}", spin_string(self.all_spin_index[ieig]));
 					if(self.nkpoints_ > 1 or self.nspin_    > 1) fmt::print(out, "\n");
 				}
