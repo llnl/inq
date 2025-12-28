@@ -100,7 +100,7 @@ These are the available subcommands:
     
     if(diff > tolerance){
 			if(input::environment::global().comm().root()) {
-				fmt::print(std::cout, "\nMatch: FAILED\n");
+				fmt::print(std::cout, "\nMatch: [\u001B[31m FAIL \u001B[0m]\n");
 				fmt::print(std::cout, "  calculated value = {:.12f}\n",  value);
 				fmt::print(std::cout, "  reference value  = {:.12f}\n",  reference);
 				fmt::print(std::cout, "  difference       = {:.1e}\n",   diff);
@@ -108,7 +108,7 @@ These are the available subcommands:
 			}
       return false;
     } else {
-      if(input::environment::global().comm().root()) fmt::print(std::cout, "Match: SUCCESS (value = {:.12f} , diff = {:.1e})\n", value, diff);
+      if(input::environment::global().comm().root()) fmt::print(std::cout, "Match: [\u001B[32m  OK  \u001B[0m] (value = {:.12f} , diff = {:.1e})\n", value, diff);
       return true;
     }
   }

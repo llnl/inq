@@ -38,7 +38,7 @@ namespace utils {
       
       if(diff > tol){
 				
-        fmt::print(std::cout, "\nMatch '{}': FAILED\n", match_name);
+        fmt::print(std::cout, "\nMatch '{}': [\u001B[31m FAIL \u001B[0m]\n", match_name);
 				if constexpr(std::is_same_v<Type, double>) {
 					fmt::print(std::cout, "  calculated value = {:.12f}\n", value);
 					fmt::print(std::cout, "  reference value  = {:.12f}\n", reference);
@@ -55,11 +55,11 @@ namespace utils {
         return false;
       } else {
 				if constexpr(std::is_same_v<Type, double>) {
-					fmt::print(std::cout, "Match '{}': SUCCESS (value = {:.12f} , diff = {:.1e})\n", match_name, value, diff);
+					fmt::print(std::cout, "Match '{}': [\u001B[32m  OK  \u001B[0m] (value = {:.12f} , diff = {:.1e})\n", match_name, value, diff);
 				} else if constexpr(std::is_same_v<Type, vector3<double>>) {
-					fmt::print(std::cout, "Match '{}': SUCCESS (value = {{{:.12f}, {:.12f}, {:.12f}}}, diff = {:.1e})\n", match_name, value[0], value[1], value[2], diff);
+					fmt::print(std::cout, "Match '{}': [\u001B[32m  OK  \u001B[0m] (value = {{{:.12f}, {:.12f}, {:.12f}}}, diff = {:.1e})\n", match_name, value[0], value[1], value[2], diff);
 				} else {
-					fmt::print(std::cout, "Match '{}': SUCCESS (value = {} , diff = {:.1e})\n", match_name, value, diff);
+					fmt::print(std::cout, "Match '{}': [\u001B[32m  OK  \u001B[0m] (value = {} , diff = {:.1e})\n", match_name, value, diff);
 				}
         return true;
       }
