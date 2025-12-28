@@ -139,11 +139,11 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			auto normres = operations::overlap_diagonal(residual);
 			
       
-      tfm::format(std::cout, "  Iteration %4d:\n", iter);
+      fmt::print(std::cout, "  Iteration {:4d}:\n", iter);
 			
       for(int ivec = 0; ivec < phi.set_size(); ivec++){
         if(num_iter - 1 == iter) CHECK(fabs(normres[ivec]) < 1e-8);
-				tfm::format(std::cout, "    state %4d  res = %15.10e\n", ivec + 1, real(normres[ivec]));
+				fmt::print(std::cout, "    state {:4d}  res = {:15.10e}\n", ivec + 1, real(normres[ivec]));
       }
 
 		}	
