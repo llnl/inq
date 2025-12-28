@@ -15,8 +15,6 @@
 #include <array>
 #include <cmath>
 
-#include <tinyformat/tinyformat.h>
-
 namespace inq {
 
 template <typename Type>

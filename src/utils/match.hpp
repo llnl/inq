@@ -13,7 +13,8 @@
 #include <array>
 #include <cmath>
 
-#include <tinyformat/tinyformat.h>
+#include <spdlog/spdlog.h> //for fmt
+#include <spdlog/fmt/ostr.h>
 
 namespace inq {
 namespace utils {
@@ -37,15 +38,15 @@ namespace utils {
       
       if(diff > tol){
 				
-        tfm::format(std::cout, "\nMatch '%s': FAILED\n", match_name);
-        tfm::format(std::cout, "  calculated value = %.12f\n", value);
-        tfm::format(std::cout, "  reference value  = %.12f\n", reference);
-        tfm::format(std::cout, "  difference       = %.1e\n", diff);
-				tfm::format(std::cout, "  tolerance        = %.1e\n\n", tol);
+        fmt::print(std::cout, "\nMatch '{}': FAILED\n", match_name);
+        fmt::print(std::cout, "  calculated value = {:.12f}\n", value);
+        fmt::print(std::cout, "  reference value  = {:.12f}\n", reference);
+        fmt::print(std::cout, "  difference       = {:.1e}\n", diff);
+				fmt::print(std::cout, "  tolerance        = {:.1e}\n\n", tol);
         ok_ = false;
         return false;
       } else {
-        tfm::format(std::cout, "Match '%s': SUCCESS (value = %.12f , diff = %.1e)\n", match_name, value, diff);
+        fmt::print(std::cout, "Match '{}': SUCCESS (value = {:.12f} , diff = {:.1e})\n", match_name, value, diff);
         return true;
       }
     }

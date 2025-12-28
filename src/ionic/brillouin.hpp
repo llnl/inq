@@ -12,13 +12,16 @@
 #include <input/kpoints.hpp>
 #include <systems/ions.hpp>
 
+#include <spdlog/spdlog.h> //for fmt
+#include <spdlog/fmt/ostr.h>
+
 namespace inq {
 namespace ionic {
 
 class brillouin {
 
 	std::vector<vector3<double, covariant>> kpoints_;
-	std::vector<double> weights_;	
+	std::vector<double> weights_;
 
 	brillouin(int size):
 		kpoints_(size),
@@ -134,7 +137,7 @@ public:
 		os << "Kpoints (" << self.size() << " total):\n";
 		for(int ikpt = 0; ikpt < self.size(); ikpt++){
 			auto kk = self.kpoint(ikpt)/(2.0*M_PI);
-			tfm::format(os, "  k-point %7d = %7.3f %7.3f %7.3f   weight = %5.3f\n", ikpt, kk[0], kk[1], kk[2], self.kpoint_weight(ikpt));
+			fmt::print(os, "  k-point {:7d} = {:7.3f} {:7.3f} {:7.3f}   weight = {:5.3f}\n", ikpt, kk[0], kk[1], kk[2], self.kpoint_weight(ikpt));
 		}
 		os << std::endl;
 		return os;

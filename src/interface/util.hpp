@@ -13,6 +13,9 @@
 #include <interface/runtime_options.hpp>
 #include <systems/ions.hpp>
 
+#include <spdlog/spdlog.h> //for fmt
+#include <spdlog/fmt/ostr.h>
+
 namespace inq {
 namespace interface {
 
@@ -97,15 +100,15 @@ These are the available subcommands:
     
     if(diff > tolerance){
 			if(input::environment::global().comm().root()) {
-				tfm::format(std::cout, "\nMatch: FAILED\n");
-				tfm::format(std::cout, "  calculated value = %.12f\n",  value);
-				tfm::format(std::cout, "  reference value  = %.12f\n",  reference);
-				tfm::format(std::cout, "  difference       = %.1e\n",   diff);
-				tfm::format(std::cout, "  tolerance        = %.1e\n\n", tolerance);
+				fmt::print(std::cout, "\nMatch: FAILED\n");
+				fmt::print(std::cout, "  calculated value = {:.12f}\n",  value);
+				fmt::print(std::cout, "  reference value  = {:.12f}\n",  reference);
+				fmt::print(std::cout, "  difference       = {:.1e}\n",   diff);
+				fmt::print(std::cout, "  tolerance        = {:.1e}\n\n", tolerance);
 			}
       return false;
     } else {
-      if(input::environment::global().comm().root()) tfm::format(std::cout, "Match: SUCCESS (value = %.12f , diff = %.1e)\n", value, diff);
+      if(input::environment::global().comm().root()) fmt::print(std::cout, "Match: SUCCESS (value = {:.12f} , diff = {:.1e})\n", value, diff);
       return true;
     }
   }

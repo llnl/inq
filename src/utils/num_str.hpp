@@ -12,7 +12,8 @@
 #include <cstdlib>
 #include <utils/calculator.hpp>
 
-#include <tinyformat/tinyformat.h>
+#include <spdlog/spdlog.h> //for fmt
+#include <spdlog/fmt/ostr.h>
 
 namespace inq {
 namespace utils {
@@ -26,7 +27,7 @@ static inline auto num_to_str(long num){
 template <typename NumType>
 static inline auto num_to_str(std::string const & fmt, NumType const & num){
 	std::stringstream ss;
-	tfm::format(ss, fmt.c_str(), num);
+	fmt::print(ss, fmt, num);
 	return ss.str();
 }
 
@@ -76,8 +77,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
     CHECK(utils::num_to_str(1024) == "0000001024");
     CHECK(utils::num_to_str(-333) == "-000000333");
 
-		CHECK(utils::num_to_str("%20.12f", 1.23456789) == "      1.234567890000");
-		CHECK(utils::num_to_str("%.12f", 1.23456789)   == "1.234567890000");		
+		CHECK(utils::num_to_str("{:20.12f}", 1.23456789) == "      1.234567890000");
+		CHECK(utils::num_to_str("{:.12f}", 1.23456789)   == "1.234567890000");
 
   }
 
