@@ -40,8 +40,6 @@
 #include <ground_state/results.hpp>
 #include <ground_state/subspace_diagonalization.hpp>
 
-#include<tinyformat/tinyformat.h>
-
 #include<spdlog/spdlog.h>
 #include<spdlog/sinks/stdout_color_sinks.h>
 

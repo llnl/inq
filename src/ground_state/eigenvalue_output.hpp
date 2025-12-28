@@ -12,8 +12,7 @@
 #include <cfloat>
 #include <systems/electrons.hpp>
 
-#include<tinyformat/tinyformat.h>
-
+#include <spdlog/spdlog.h>
 #include <utils/profiling.hpp>
 
 namespace inq {
@@ -115,7 +114,7 @@ public:
 			}
 			
 			if(skipped > 0) {
-				tfm::format(out, "    [output of %d eigenvalues suppressed,  minres = %5.0e  maxres = %5.0e]\n", skipped, minres, maxres);
+				fmt::print(out, "    [output of {:d} eigenvalues suppressed,  minres = {:5.0e}  maxres = {:5.0e}]\n", skipped, minres, maxres);
 				skipped = 0;
 				minres = 1000.0;
 				maxres = 0.0;			
@@ -123,9 +122,9 @@ public:
 
 			auto kpoint = self.electrons_.brillouin_zone().kpoint(self.all_kpoint_index[ieig])/(2.0*M_PI);
 			
-			if(self.nkpoints_ > 1) tfm::format(out, "  kpt = (%5.2f,%5.2f,%5.2f)", kpoint[0], kpoint[1], kpoint[2]);
-			if(self.nspin_    > 1) tfm::format(out, "  spin = %s", spin_string(self.all_spin_index[ieig]));
-			tfm::format(out, "  st = %4d  occ = %4.3f  evalue = %18.12f  res = %5.0e\n",
+			if(self.nkpoints_ > 1) fmt::print(out, "  kpt = ({:5.2f},{:5.2f},{:5.2f})", kpoint[0], kpoint[1], kpoint[2]);
+			if(self.nspin_    > 1) fmt::print(out, "  spin = {}", spin_string(self.all_spin_index[ieig]));
+			fmt::print(out, "  st = {:4d}  occ = {:4.3f}  evalue = {:18.12f}  res = {:5.0e}\n",
 									self.all_states_index[ieig] + 1, self.all_occupations[ieig], real(self.all_eigenvalues[ieig]), fabs(self.all_normres[ieig]));
 		}
 
@@ -155,12 +154,12 @@ public:
 
 					auto kpoint = self.electrons_.brillouin_zone().kpoint(self.all_kpoint_index[ieig])/(2.0*M_PI);
 
-					if(self.nkpoints_ > 1) tfm::format(out, "  kpt = (%5.2f,%5.2f,%5.2f)", kpoint[0], kpoint[1], kpoint[2]);
-					if(self.nspin_    > 1) tfm::format(out, "  spin = %s", spin_string(self.all_spin_index[ieig]));
-					if(self.nkpoints_ > 1 or self.nspin_    > 1) tfm::format(out, "\n");
+					if(self.nkpoints_ > 1) fmt::print(out, "  kpt = (:5.2f},{:5.2f},{:5.2f})", kpoint[0], kpoint[1], kpoint[2]);
+					if(self.nspin_    > 1) fmt::print(out, "  spin = {}", spin_string(self.all_spin_index[ieig]));
+					if(self.nkpoints_ > 1 or self.nspin_    > 1) fmt::print(out, "\n");
 				}
 				
-				tfm::format(out, "    st = %4d  occ = %4.3f  evalue = %18.12f Ha (%18.12f eV)  res = %5.0e\n",
+				fmt::print(out, "    st = {:4d}  occ = {:4.3f}  evalue = {:18.12f} Ha ({:18.12f} eV)  res = {:5.0e}\n",
 										self.all_states_index[ieig] + 1, self.all_occupations[ieig], real(self.all_eigenvalues[ieig]), real(self.all_eigenvalues[ieig])*27.211383, fabs(self.all_normres[ieig]));
 			}
 			
