@@ -9,9 +9,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include <gpu/array.hpp>
-#include <tinyformat/tinyformat.h>
 #include <algorithm>
+
+#include <gpu/array.hpp>
 #include <utils/skeleton_wrapper.hpp>
 #include <utils/raw_pointer_cast.hpp>
 #include <basis/real_space.hpp>
@@ -181,24 +181,6 @@ public:
 
 		constexpr auto local_set_size() const {
 			return 1;
-		}
-
-		template <int dir = 2>
-		friend void print_debug(const field & fld, const std::string & filename){
-
-			std::ofstream file(filename);
-
-			std::array<int, 3> point = {0, 0, 0};
-
-			auto size = get<dir>(sizes(fld.cubic()));
-			
-			for(int ii = 0; ii < size; ii++){
-				auto ip = ii + size/2;
-				if(ip >= size) ip -= size;
-				point[dir] = ip;
-				auto rr = fld.basis().rvector(point);
-				tfm::format(file, "%f %e %e\n", rr[dir], inq::real(fld.cubic()[point[0]][point[1]][point[2]]), imag(fld.cubic()[point[0]][point[1]][point[2]]));
-			}
 		}
 
 		void prefetch() const {
