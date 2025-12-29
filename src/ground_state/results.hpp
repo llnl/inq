@@ -75,8 +75,8 @@ struct results {
 		auto pressure  = -(self.stress[0][0] + self.stress[1][1] + self.stress[2][2])/3.0;
 		std::cout << " pressure       = " << pressure << " Ha/b^3 | " << pressure*29421.016 << " GPa \n";
     std::cout << " total energy   = "
-              << utils::num_to_str("%.8f", self.energy.total()) << " Ha | "
-              << utils::num_to_str("%.8f", self.energy.total()/in_atomic_units(1.0_eV)) << " eV \n";
+              << utils::num_to_str("{:.8f}", self.energy.total()) << " Ha | "
+              << utils::num_to_str("{:.8f}", self.energy.total()/in_atomic_units(1.0_eV)) << " eV \n";
     std::cout << std::endl;
     return out;
   }

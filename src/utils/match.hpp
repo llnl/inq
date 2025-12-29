@@ -13,7 +13,8 @@
 #include <array>
 #include <cmath>
 
-#include <tinyformat/tinyformat.h>
+#include <spdlog/spdlog.h> //for fmt
+#include <spdlog/fmt/ostr.h>
 
 namespace inq {
 namespace utils {
@@ -29,23 +30,39 @@ namespace utils {
 		}
 
     template <class Type>
-    auto check(const std::string & match_name, const Type & value, const Type & reference, double tol = 0.0){
+    auto check(std::string match_name, const Type & value, const Type & reference, double tol = 0.0){
 
 			if(tol == 0.0) tol = tol_;
 			
       auto diff = fabs(reference - value);
-      
+
+			match_name = "'" + match_name + "':";
+			
       if(diff > tol){
 				
-        tfm::format(std::cout, "\nMatch '%s': FAILED\n", match_name);
-        tfm::format(std::cout, "  calculated value = %.12f\n", value);
-        tfm::format(std::cout, "  reference value  = %.12f\n", reference);
-        tfm::format(std::cout, "  difference       = %.1e\n", diff);
-				tfm::format(std::cout, "  tolerance        = %.1e\n\n", tol);
+        fmt::print(std::cout, "\nMatch {} [\u001B[31m FAIL \u001B[0m]\n", match_name);
+				if constexpr(std::is_same_v<Type, double>) {
+					fmt::print(std::cout, "  calculated value = {:.12f}\n", value);
+					fmt::print(std::cout, "  reference value  = {:.12f}\n", reference);
+				} else  if constexpr(std::is_same_v<Type, vector3<double>>) {
+					fmt::print(std::cout, "  calculated value = {{{:.12f}, {:.12f}, {:.12f}}}\n", value[0], value[1], value[2]);
+					fmt::print(std::cout, "  reference value  = {{{:.12f}, {:.12f}, {:.12f}}}\n", reference[0], reference[1], reference[2]);
+				} else {
+					fmt::print(std::cout, "  calculated value = {}\n", value);
+					fmt::print(std::cout, "  reference value  = {}\n", reference);
+				}
+				fmt::print(std::cout, "  difference       = {:.1e}\n", diff);
+				fmt::print(std::cout, "  tolerance        = {:.1e}\n\n", tol);
         ok_ = false;
         return false;
       } else {
-        tfm::format(std::cout, "Match '%s': SUCCESS (value = %.12f , diff = %.1e)\n", match_name, value, diff);
+				if constexpr(std::is_same_v<Type, double>) {
+					fmt::print(std::cout, "Match {:30} [\u001B[32m  OK  \u001B[0m] (value = {:.12f} , diff = {:.1e})\n", match_name, value, diff);
+				} else if constexpr(std::is_same_v<Type, vector3<double>>) {
+					fmt::print(std::cout, "Match {:30} [\u001B[32m  OK  \u001B[0m] (value = {{{:.12f}, {:.12f}, {:.12f}}}, diff = {:.1e})\n", match_name, value[0], value[1], value[2], diff);
+				} else {
+					fmt::print(std::cout, "Match {:30} [\u001B[32m  OK  \u001B[0m] (value = {} , diff = {:.1e})\n", match_name, value, diff);
+				}
         return true;
       }
     }

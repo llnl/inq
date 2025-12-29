@@ -13,8 +13,6 @@
 #include <array>
 #include <cmath>
 
-#include <tinyformat/tinyformat.h>
-
 namespace inq {
 namespace utils {
 

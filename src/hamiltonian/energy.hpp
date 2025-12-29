@@ -11,7 +11,8 @@
 
 #include <operations/shift.hpp>
 
-#include <tinyformat/tinyformat.h>
+#include <spdlog/spdlog.h> //for fmt
+#include <spdlog/fmt/ostr.h>
 
 namespace inq {
 namespace hamiltonian {
@@ -258,20 +259,20 @@ public:
 		template<class OStream>
 		friend OStream & operator<<(OStream & out, energy const & self){
 
-			tfm::format(out, "Energy:\n");
-			tfm::format(out, "  total          = %20.12f Ha\n", self.total());
-			tfm::format(out, "  kinetic        = %20.12f Ha\n", self.kinetic());
-			tfm::format(out, "  eigenvalues    = %20.12f Ha\n", self.eigenvalues_);
-			tfm::format(out, "  hartree        = %20.12f Ha\n", self.hartree());
-			tfm::format(out, "  external       = %20.12f Ha\n", self.external());
-			tfm::format(out, "  non-local      = %20.12f Ha\n", self.non_local());
-			tfm::format(out, "  xc             = %20.12f Ha\n", self.xc());
-			tfm::format(out, "  mgga           = %20.12f Ha\n", self.mgga());
-			tfm::format(out, "  nvxc           = %20.12f Ha\n", self.nvxc());
-			tfm::format(out, "  exact-exchange = %20.12f Ha\n", self.exact_exchange());
-			tfm::format(out, "  ion            = %20.12f Ha\n", self.ion());
-			tfm::format(out, "  zeeman-energy  = %20.12f Ha\n", self.zeeman_energy());
-			tfm::format(out, "\n");
+			fmt::print(out, "Energy:\n");
+			fmt::print(out, "  total          = {:20.12f} Ha\n", self.total());
+			fmt::print(out, "  kinetic        = {:20.12f} Ha\n", self.kinetic());
+			fmt::print(out, "  eigenvalues    = {:20.12f} Ha\n", self.eigenvalues_);
+			fmt::print(out, "  hartree        = {:20.12f} Ha\n", self.hartree());
+			fmt::print(out, "  external       = {:20.12f} Ha\n", self.external());
+			fmt::print(out, "  non-local      = {:20.12f} Ha\n", self.non_local());
+			fmt::print(out, "  xc             = {:20.12f} Ha\n", self.xc());
+			fmt::print(out, "  mgga           = {:20.12f} Ha\n", self.mgga());
+			fmt::print(out, "  nvxc           = {:20.12f} Ha\n", self.nvxc());
+			fmt::print(out, "  exact-exchange = {:20.12f} Ha\n", self.exact_exchange());
+			fmt::print(out, "  ion            = {:20.12f} Ha\n", self.ion());
+			fmt::print(out, "  zeeman-energy  = {:20.12f} Ha\n", self.zeeman_energy());
+			fmt::print(out, "\n");
 
 			return out;
 		}

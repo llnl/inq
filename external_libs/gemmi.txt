@@ -1,7 +1,0 @@
-To update gemmi,
-from the top directory of the git repo:
-
-$ git rm -r external_libs/gemmi
-$ git commit -m "remove old gemmi"
-$ git subtree add --squash -P external_libs/gemmi https://github.com/project-gemmi/gemmi.git master
-$ git commit -m "add back new gemmi"

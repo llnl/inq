@@ -153,10 +153,10 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			auto normres = operations::overlap_diagonal(residual);
 			
 			/*
-				tfm::format(std::cout, "  Iteration %4d:\n", iter);
+				fmt::print(std::cout, "  Iteration {:4d}:\n", iter);
 				
 				for(int ivec = 0; ivec < phi.local_set_size(); ivec++){
-				tfm::format(std::cout, "    state %4d  evalue = %18.12f  res = %15.10e\n", ivec + 1, real(eigenvalues[ivec]), real(normres[ivec]));
+				fmt::print(std::cout, "    state {:4d}  evalue = {:18.12f}  res = {:15.10e}\n", ivec + 1, real(eigenvalues[ivec]), real(normres[ivec]));
 				}
 			*/
 
@@ -212,7 +212,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 			auto normres = operations::overlap_diagonal(residual);
 			
 			for(int ivec = 0; ivec < phi.local_set_size(); ivec++){
-				tfm::format(std::cout, " state %4d  evalue = %18.12f  res = %5.0e\n", ivec + 1, real(eigenvalues[ivec]), real(normres[ivec]));
+				fmt::print(std::cout, " state {:4d}  evalue = {:18.12f}  res = {:5.0e}\n", ivec + 1, real(eigenvalues[ivec]), real(normres[ivec]));
 			}
 		}
 	}
