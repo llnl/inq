@@ -20,7 +20,7 @@
 namespace inq {
 namespace ground_state {
 	
-void initial_guess(const systems::ions & ions, systems::electrons & electrons, std::optional<vector3<double>> const & magnet_dir = {}){
+void initial_guess(const systems::ions & ions, systems::electrons & electrons, std::vector<vector3<double>> const & magnet_dir = {}){
 	CALI_CXX_MARK_FUNCTION;
 	
 	int iphi = 0;
