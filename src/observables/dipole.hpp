@@ -21,23 +21,18 @@
 namespace inq {
 namespace observables {
 
-basis::field<basis::real_space, vector3<double>> dipole_density(basis::field<basis::real_space, double> const & density) {
+vector3<double> dipole(basis::field<basis::real_space, double> const & density) {
 	CALI_CXX_MARK_FUNCTION;
 
-	basis::field<basis::real_space, vector3<double>> dipole(density.basis());
+	auto dip = gpu::run(gpu::reduce(density.basis().local_sizes()[2]), gpu::reduce(density.basis().local_sizes()[1]), gpu::reduce(density.basis().local_sizes()[0]), vector3<double>{0.0, 0.0, 0.0},
+											[point_op = density.basis().point_op(), _density = density.cubic().cbegin()] GPU_LAMBDA (auto iz, auto iy, auto ix){
+												
+												return point_op.rvector_cartesian(ix, iy, iz)*_density[ix][iy][iz];
+											});
 
-	gpu::run(density.basis().local_sizes()[2], density.basis().local_sizes()[1], density.basis().local_sizes()[0],
-					 [point_op = density.basis().point_op(), dens = begin(density.cubic()), dip = begin(dipole.cubic())] GPU_LAMBDA (auto iz, auto iy, auto ix){
-
-						 dip[ix][iy][iz] = point_op.rvector_cartesian(ix, iy, iz)*dens[ix][iy][iz];
-					 });
+	if(density.basis().comm().size() > 1) density.basis().comm().all_reduce_in_place_n(&dip, 1, std::plus<>{});
 	
-	return dipole;
-}
-
-auto dipole(basis::field<basis::real_space, double> const & density) {
-	CALI_CXX_MARK_FUNCTION;
-	return operations::integral(dipole_density(density));
+	return density.basis().volume_element()*dip;
 }
 
 vector3<double> dipole(systems::ions const & ions, const hamiltonian::atomic_potential & atomic_pot){
