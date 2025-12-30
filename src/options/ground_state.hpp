@@ -57,7 +57,7 @@ public:
 		if(readval == "linear"){
 			self = mixing_algo::LINEAR;
 		} else if(readval == "broyden"){
-			self = mixing_algo::LINEAR;
+			self = mixing_algo::BROYDEN;
 		} else {
 			throw std::runtime_error("INQ error: Invalid mixing algorithm");
 		}
