@@ -212,8 +212,11 @@ public:
 				auto ev_out = eigenvalues_output(electrons, normres);
 				
 				if(solver_.verbose_output() and console){
-					console->info("\nSCF iter {} : wtime = {:5.2f}s e = {:.10f} de = {:5.0e} dexe = {:5.0e} dn = {:5.0e} dst = {:5.0e}\n{}", 
-												iiter, elapsed_seconds.count(), res.energy.total(), energy_diff, exe_diff, density_diff, state_conv, ev_out);
+					std::string desc = "\nSCF iter {iter} : wtime = {wtime:5.1f}s e = {energy:.10f} de = {de: 5.0e} dn = {dn:5.0e} dst = {dst:5.0e}";
+					if(ham_.exchange().enabled()) desc += " dexx = {dexx:5.0e}";
+					desc += "\n{ev_out}";
+					console->info(desc, fmt::arg("iter", iiter), fmt::arg("wtime", elapsed_seconds.count()), fmt::arg("energy", res.energy.total()), fmt::arg("de", energy_diff),
+												fmt::arg("dn", density_diff), fmt::arg("dst", state_conv), fmt::arg("dexx", exe_diff), fmt::arg("ev_out", ev_out));
 				}
 				
 				if(fabs(energy_diff) < solver_.energy_tolerance()){
