@@ -133,7 +133,8 @@ public:
 		
 		double old_exe = ham_.exchange().update(electrons);
 		double exe_diff = fabs(old_exe);
-		auto update_hf = false;
+		auto const exx_update_max = 5;
+		auto exx_count = exx_update_max;
 		
 		electrons.full_comm().barrier();
 		auto iter_start_time = std::chrono::high_resolution_clock::now();
@@ -153,11 +154,13 @@ public:
 				}
 				electrons.update_occupations(electrons.eigenvalues());
 			}
-			
-			if(update_hf){
+
+			exx_count--;
+			if(exx_count < 1){
 				auto exe = ham_.exchange().update(electrons);
 				exe_diff = fabs(exe - old_exe);
 				old_exe = exe;
+				exx_count = exx_update_max;
 			}
 			
 			for(auto & phi : electrons.kpin()) {
@@ -211,8 +214,11 @@ public:
 				auto ev_out = eigenvalues_output(electrons, normres);
 				
 				if(solver_.verbose_output() and console){
-					console->info("\nSCF iter {} : wtime = {:5.2f}s e = {:.10f} de = {:5.0e} dexe = {:5.0e} dn = {:5.0e} dst = {:5.0e}\n{}", 
-												iiter, elapsed_seconds.count(), res.energy.total(), energy_diff, exe_diff, density_diff, state_conv, ev_out);
+					std::string desc = "\nSCF iter {iter} : wtime = {wtime:5.1f}s e = {energy:.10f} de = {de: 5.0e} dn = {dn:5.0e} dst = {dst:5.0e}";
+					if(ham_.exchange().enabled()) desc += " dexx = {dexx:5.0e}";
+					desc += "\n{ev_out}";
+					console->info(desc, fmt::arg("iter", iiter), fmt::arg("wtime", elapsed_seconds.count()), fmt::arg("energy", res.energy.total()), fmt::arg("de", energy_diff),
+												fmt::arg("dn", density_diff), fmt::arg("dst", state_conv), fmt::arg("dexx", exe_diff), fmt::arg("ev_out", ev_out));
 				}
 				
 				if(fabs(energy_diff) < solver_.energy_tolerance()){
@@ -222,7 +228,7 @@ public:
 						converged = true;
 						break;
 					}
-					if(conv_count > 2) update_hf = true;
+					if(conv_count > 2) exx_count = 0;
 				} else {
 					conv_count = 0; 
 				}

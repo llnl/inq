@@ -23,6 +23,7 @@ inq run ground-state
 
 inq theory Hartree-Fock
 inq ground-state tolerance 1e-8
+inq ground-state max-steps 400
 inq run ground-state
 
 inq util match `inq results ground-state energy total`         -30.503525726628  3e-5
