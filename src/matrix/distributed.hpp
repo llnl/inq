@@ -69,7 +69,14 @@ public:
 	auto sizey() const {
 		return party().size();
 	}
-  
+	
+ 	auto local_sizex() const {
+		return partx().local_size();
+	}
+
+	auto local_sizey() const {
+		return party().local_size();
+	} 
 };
 
 }
