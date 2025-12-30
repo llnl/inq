@@ -23,9 +23,9 @@ basis::field_set<basis::real_space, double> kinetic_energy_density(systems::elec
 
 	CALI_CXX_MARK_FUNCTION;
 
-	basis::field_set<basis::real_space, double> density(electrons.states_basis(), electrons.states().num_density_components());
+	basis::field_set<basis::real_space, double> kdensity(electrons.states_basis(), electrons.states().num_density_components());
 
-	density.fill(0.0);
+	kdensity.fill(0.0);
 
 	auto iphi = 0;
 	for(auto & phi : electrons.kpin()){
@@ -33,23 +33,23 @@ basis::field_set<basis::real_space, double> kinetic_energy_density(systems::elec
 
 		if(not phi.spinors()){
 			
-			gpu::run(density.basis().part().local_size(),
-							 [nst = gphi.set_part().local_size(), occ = begin(electrons.occupations()[iphi]), gph = begin(gphi.matrix()),
-								den = begin(density.matrix()), cell = density.basis().cell(), ispin = phi.spin_index()] GPU_LAMBDA (auto ipoint){
-								 for(int ist = 0; ist < nst; ist++) den[ipoint][ispin] += 0.5*occ[ist]*cell.norm(gph[ipoint][ist]);
+			gpu::run(kdensity.basis().part().local_size(),
+							 [nst = gphi.set_part().local_size(), cell = kdensity.basis().cell(), ispin = phi.spin_index(),
+								_occupations = electrons.occupations()[iphi].cbegin(), _gphi = gphi.matrix().cbegin(), _kdensity = kdensity.matrix().begin()] GPU_LAMBDA (auto ipoint){
+								 for(int ist = 0; ist < nst; ist++) _kdensity[ipoint][ispin] += 0.5*_occupations[ist]*cell.norm(_gphi[ipoint][ist]);
 							 });
 
 		} else {
 			
-			gpu::run(density.basis().part().local_size(),
-							 [nst = gphi.local_spinor_set_size(), occ = begin(electrons.occupations()[iphi]), gph = begin(gphi.spinor_array()),
-								den = begin(density.matrix()), cell = density.basis().cell()] GPU_LAMBDA (auto ipoint){
+			gpu::run(kdensity.basis().part().local_size(),
+							 [nst = gphi.local_spinor_set_size(), cell = kdensity.basis().cell(),
+								_occupations = electrons.occupations()[iphi].cbegin(), _gphi = gphi.spinor_array().cbegin(), _kdensity = kdensity.matrix().begin()] GPU_LAMBDA (auto ipoint){
 								 for(int ist = 0; ist < nst; ist++) {
-									 den[ipoint][0] += 0.5*occ[ist]*cell.norm(gph[ipoint][0][ist]);
-									 den[ipoint][1] += 0.5*occ[ist]*cell.norm(gph[ipoint][1][ist]);
-									 auto crossterm = 0.5*occ[ist]*cell.dot(gph[ipoint][0][ist], gph[ipoint][1][ist]);
-									 den[ipoint][2] += real(crossterm);
-									 den[ipoint][3] += imag(crossterm);
+									 _kdensity[ipoint][0] += 0.5*_occupations[ist]*cell.norm(_gphi[ipoint][0][ist]);
+									 _kdensity[ipoint][1] += 0.5*_occupations[ist]*cell.norm(_gphi[ipoint][1][ist]);
+									 auto crossterm = 0.5*_occupations[ist]*cell.dot(_gphi[ipoint][0][ist], _gphi[ipoint][1][ist]);
+									 _kdensity[ipoint][2] += real(crossterm);
+									 _kdensity[ipoint][3] += imag(crossterm);
 								 }
 							 });
 			
@@ -58,8 +58,8 @@ basis::field_set<basis::real_space, double> kinetic_energy_density(systems::elec
 		iphi++;
 	}
 
-	density.all_reduce(electrons.kpin_states_comm());
-	return density;
+	kdensity.all_reduce(electrons.kpin_states_comm());
+	return kdensity;
 	
 }
 
