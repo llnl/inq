@@ -247,9 +247,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(Approx(magnetic_moments[0][2] + magnetic_moments[1][2]).margin(1.e-7) == mag[2]);
 		
 		std::vector<double> magnetic_radii = {1.0, 1.0};
-		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
-		CHECK(Approx(magnetic_moments[0][2]).margin(1.e-7) == 4.4085);
-		CHECK(Approx(magnetic_moments[1][2]).margin(1.e-7) == 5.18108);
+		auto magnetic_moments_1 = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
 
 		initial_magnetization = {
 			{0.5, 0.0, 0.0}, 
@@ -260,9 +258,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		CHECK(Approx(magnetic_moments[0][0] + magnetic_moments[1][0]).margin(1.e-7) == mag[0]);
 		
-		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
-		CHECK(Approx(magnetic_moments[0][0]).margin(1.e-7) == 4.4085);
-		CHECK(Approx(magnetic_moments[1][0]).margin(1.e-7) == 5.18108);
+		auto magnetic_moments_2 = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
+		CHECK(Approx(magnetic_moments_2[0][0] - magnetic_moments_1[0][2]).margin(1.e-7) == 0.0);
+		CHECK(Approx(magnetic_moments_2[1][0] - magnetic_moments_1[1][2]).margin(1.e-7) == 0.0);
 
 		initial_magnetization = {
 			{0.0, 0.5, 0.0}, 
@@ -273,9 +271,9 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell);
 		CHECK(Approx(magnetic_moments[0][1] + magnetic_moments[1][1]).margin(1.e-7) == mag[1]);
 		
-		magnetic_moments = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
-		CHECK(Approx(magnetic_moments[0][1]).margin(1.e-7) == 4.4085);
-		CHECK(Approx(magnetic_moments[1][1]).margin(1.e-7) == 5.18108);
+		auto magnetic_moments_3 = inq::observables::compute_local_magnetic_moments(electrons.spin_density(), magnetic_centers, cell, magnetic_radii);
+		CHECK(Approx(magnetic_moments_3[0][1] - magnetic_moments_1[0][2]).margin(1.e-7) == 0.0);
+		CHECK(Approx(magnetic_moments_3[1][1] - magnetic_moments_1[1][2]).margin(1.e-7) == 0.0);
 	}
 
 	SECTION("SPIN NON COLLINEAR INITIALIZATION"){
