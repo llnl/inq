@@ -31,8 +31,8 @@ void calculate_add(const occupations_array_type & occupations, field_set_type & 
 		assert(phi.spin_index() < density.set_size());
 
 		gpu::run(phi.basis().part().local_size(),
-						 [nst = phi.set_part().local_size(), occ = begin(occupations), ph = begin(phi.matrix()), den = begin(density.matrix()), ispin = phi.spin_index()] GPU_LAMBDA (auto ipoint){
-							 for(int ist = 0; ist < nst; ist++) den[ipoint][ispin] += occ[ist]*norm(ph[ipoint][ist]);
+						 [nst = phi.set_part().local_size(), ispin = phi.spin_index(), _occupations = occupations.cbegin(), _phi = phi.matrix().cbegin(), _density = density.matrix().begin()] GPU_LAMBDA (auto ipoint){
+							 for(int ist = 0; ist < nst; ist++) _density[ipoint][ispin] += _occupations[ist]*norm(_phi[ipoint][ist]);
 						 });
 	} else {
 		
@@ -42,13 +42,13 @@ void calculate_add(const occupations_array_type & occupations, field_set_type & 
 		assert(get<2>(sizes(phi.spinor_array())) == phi.local_spinor_set_size());
 		
 		gpu::run(phi.basis().part().local_size(),
-						 [nst = phi.local_spinor_set_size(), occ = begin(occupations), ph = begin(phi.spinor_array()), den = begin(density.matrix())] GPU_LAMBDA (auto ipoint){
+						 [nst = phi.local_spinor_set_size(), _occupations = occupations.cbegin(), _phi = phi.spinor_array().cbegin(), _density = density.matrix().begin()] GPU_LAMBDA (auto ipoint){
 							 for(int ist = 0; ist < nst; ist++) {
-								 den[ipoint][0] += occ[ist]*norm(ph[ipoint][0][ist]);
-								 den[ipoint][1] += occ[ist]*norm(ph[ipoint][1][ist]);
-								 auto crossterm = occ[ist]*ph[ipoint][0][ist]*conj(ph[ipoint][1][ist]);
-								 den[ipoint][2] += real(crossterm);
-								 den[ipoint][3] += imag(crossterm);
+								 _density[ipoint][0] += _occupations[ist]*norm(_phi[ipoint][0][ist]);
+								 _density[ipoint][1] += _occupations[ist]*norm(_phi[ipoint][1][ist]);
+								 auto crossterm = _occupations[ist]*_phi[ipoint][0][ist]*conj(_phi[ipoint][1][ist]);
+								 _density[ipoint][2] += real(crossterm);
+								 _density[ipoint][3] += imag(crossterm);
 							 }
 						 });
 	}
@@ -63,11 +63,11 @@ void calculate_gradient_add(const occupations_array_type & occupations, field_se
 	CALI_CXX_MARK_SCOPE("density::calculate_gradient");
 
 	gpu::run(phi.basis().part().local_size(),
-					 [nst = phi.local_spinor_set_size(), occs = begin(occupations),	phip = begin(phi.spinor_array()), gphip = begin(gphi.spinor_array()), gdensityp = begin(gdensity.linear()), nspinor = phi.spinor_dim()]
+					 [nst = phi.local_spinor_set_size(), nspinor = phi.spinor_dim(), _occupations = occupations.cbegin(),	_phi = phi.spinor_array().cbegin(), _gphi = gphi.spinor_array().cbegin(), _gdensity = gdensity.linear().begin()]
 					 GPU_LAMBDA (auto ip){
 						 for(int ispinor = 0; ispinor < nspinor; ispinor++){
 							 for(int ist = 0; ist < nst; ist++) {
-								 gdensityp[ip] += occs[ist]*real(conj(gphip[ip][ispinor][ist])*phip[ip][ispinor][ist] + conj(phip[ip][ispinor][ist])*gphip[ip][ispinor][ist]);
+								 _gdensity[ip] += _occupations[ist]*real(conj(_gphi[ip][ispinor][ist])*_phi[ip][ispinor][ist] + conj(_phi[ip][ispinor][ist])*_gphi[ip][ispinor][ist]);
 							 }
 						 }
 					 });
@@ -112,8 +112,8 @@ auto normalize(FieldType & density, const double & total_charge) -> typename Fie
 	assert(fabs(qq) > 1e-16);
 
 	gpu::run(density.local_set_size(), density.basis().local_size(),
-					 [den = begin(density.matrix()), factor = total_charge/qq] GPU_LAMBDA (auto ist, auto ip){ 
-						 den[ip][ist] *= factor;
+					 [factor = total_charge/qq, _density = density.matrix().begin()] GPU_LAMBDA (auto ist, auto ip){ 
+						 _density[ip][ist] *= factor;
 					 });
 	return qq;
 }
@@ -131,9 +131,9 @@ basis::field<BasisType, ElementType> total(basis::field_set<BasisType, ElementTy
 	basis::field<BasisType, ElementType> total_density(spin_density.basis());
 
 	gpu::run(spin_density.basis().local_size(),
-					 [spi = begin(spin_density.matrix()), tot = begin(total_density.linear()), nspin = spin_density.set_size()] GPU_LAMBDA (auto ip){
-						 if(nspin == 1) tot[ip] = spi[ip][0];
-						 else tot[ip] = spi[ip][0] + spi[ip][1];
+					 [nspin = spin_density.set_size(), _spin_density = spin_density.matrix().cbegin(), _total_density = total_density.linear().begin()] GPU_LAMBDA (auto ip){
+						 if(nspin == 1) _total_density[ip] = _spin_density[ip][0];
+						 else _total_density[ip] = _spin_density[ip][0] + _spin_density[ip][1];
 					 });
 
 	return total_density;

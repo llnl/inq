@@ -60,8 +60,8 @@ public:
 			CALI_CXX_MARK_FUNCTION;
 			
 			assert(occupations.size() == array.size());
-			return gpu::run(gpu::reduce(array.size()), 0.0, [occ = begin(occupations), arr = begin(array)] GPU_LAMBDA (auto ip) {
-				return occ[ip]*real(arr[ip]);
+			return gpu::run(gpu::reduce(array.size()), 0.0, [_occupations = occupations.cbegin(), _array = array.cbegin()] GPU_LAMBDA (auto ip) {
+				return _occupations[ip]*real(_array[ip]);
 			});
 		}
 
@@ -372,13 +372,13 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
 
 			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
-													 [nst, hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 [nst, _hphi_r = begin(hphi_r.hypercubic()), _hphi_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 													 
 														 auto acc_r = 0.0;
 														 auto acc_f = 0.0;
 														 for(int ist = 0; ist < nst; ist++) {
-															 acc_r += fabs(hph_r[ix][iy][iz][ist] - 0.0);
-															 acc_f += fabs(hph_f[ix][iy][iz][ist] - 0.0);
+															 acc_r += fabs(_hphi_r[ix][iy][iz][ist] - 0.0);
+															 acc_f += fabs(_hphi_f[ix][iy][iz][ist] - 0.0);
 														 }
 														 return complex{acc_r, acc_f};
 													 });
@@ -397,7 +397,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double kk = 2.0*M_PI/rs.rlength()[0];
 		
 			gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
-							 [kk, nst, pot = begin(ham.scalar_potential().hypercubic()), ph = begin(phi.hypercubic()), point_op = rs.point_op(),
+							 [kk, nst, pot = begin(ham.scalar_potential().hypercubic()), _phi = begin(phi.hypercubic()), point_op = rs.point_op(),
 								part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 								 pot[ix][iy][iz][0] = 0.0;
 
@@ -409,7 +409,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 								 
 									 auto istg = set_part.local_to_global(ist);
 									 double xx = point_op.rvector_cartesian(ixg, iyg, izg)[0];
-									 ph[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
+									 _phi[ix][iy][iz][ist] = complex(cos(istg.value()*kk*xx), sin(istg.value()*kk*xx));
 								 }
 							 });
 
@@ -417,14 +417,14 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
 		
 			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
-													 [kk, nst, ph = begin(phi.hypercubic()), hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic()), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 [kk, nst, _phi = begin(phi.hypercubic()), _hphi_r = begin(hphi_r.hypercubic()), _hphi_f = begin(hphi_f.hypercubic()), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 													 
 														 auto acc_r = 0.0;
 														 auto acc_f = 0.0;
 														 for(int ist = 0; ist < nst; ist++){
 															 auto istg = set_part.local_to_global(ist);
-															 acc_r += fabs(hph_r[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
-															 acc_f += fabs(hph_f[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*ph[ix][iy][iz][ist]);
+															 acc_r += fabs(_hphi_r[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*_phi[ix][iy][iz][ist]);
+															 acc_f += fabs(_hphi_f[ix][iy][iz][ist] - 0.5*istg.value()*kk*istg.value()*kk*_phi[ix][iy][iz][ist]);
 														 }
 														 return complex{acc_r, acc_f};
 													 });
@@ -442,7 +442,7 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 			double ww = 2.0;
 
 			gpu::run(rs.local_sizes()[2], rs.local_sizes()[1], rs.local_sizes()[0],
-							 [ww, nst, pot = begin(ham.scalar_potential().hypercubic()), ph = begin(phi.hypercubic()), point_op = rs.point_op(),
+							 [ww, nst, pot = begin(ham.scalar_potential().hypercubic()), _phi = begin(phi.hypercubic()), point_op = rs.point_op(),
 								part0 = rs.cubic_part(0), part1 = rs.cubic_part(1), part2 = rs.cubic_part(2), set_part = phi.set_part()] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 
 								 auto ixg = part0.local_to_global(ix);
@@ -452,19 +452,19 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG){
 								 double r2 = point_op.r2(ixg, iyg, izg);
 								 pot[ix][iy][iz][0] = 0.5*ww*ww*r2;
 							 
-								 for(int ist = 0; ist < nst; ist++) ph[ix][iy][iz][ist] = exp(-ww*r2);
+								 for(int ist = 0; ist < nst; ist++) _phi[ix][iy][iz][ist] = exp(-ww*r2);
 							 });
 
 			auto hphi_r = ham(phi);
 			auto hphi_f = operations::transform::to_real(ham(operations::transform::to_fourier(phi)));
 		
 			auto diff = gpu::run(gpu::reduce(rs.local_sizes()[2]), gpu::reduce(rs.local_sizes()[1]), gpu::reduce(rs.local_sizes()[0]), complex{0.0, 0.0},
-													 [ww, nst, ph = begin(phi.hypercubic()), hph_r = begin(hphi_r.hypercubic()), hph_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
+													 [ww, nst, _phi = begin(phi.hypercubic()), _hphi_r = begin(hphi_r.hypercubic()), _hphi_f = begin(hphi_f.hypercubic())] GPU_LAMBDA (auto iz, auto iy, auto ix) {
 														 auto acc_r = 0.0;
 														 auto acc_f = 0.0;
 														 for(int ist = 0; ist < nst; ist++)	{
-															 acc_r += fabs(hph_r[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
-															 acc_f += fabs(hph_f[ix][iy][iz][ist] - 1.5*ww*ph[ix][iy][iz][ist]);
+															 acc_r += fabs(_hphi_r[ix][iy][iz][ist] - 1.5*ww*_phi[ix][iy][iz][ist]);
+															 acc_f += fabs(_hphi_f[ix][iy][iz][ist] - 1.5*ww*_phi[ix][iy][iz][ist]);
 														 }
 														 return complex{acc_r, acc_f};
 													 });

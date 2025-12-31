@@ -82,11 +82,11 @@ private:
 	stress_type stress_kinetic(GPhi const & gphi, Occupations const & occupations) {
 
 		auto stress1d = gpu::run(6, gpu::reduce(gphi.local_set_size()), gpu::reduce(gphi.basis().local_size()), 0.0,
-														 [cell = gphi.basis().cell(), gph = begin(gphi.matrix()), occ = begin(occupations)] GPU_LAMBDA (auto index, auto ist, auto ip) {
+														 [cell = gphi.basis().cell(),  occupations_ = occupations.cbegin(), _gphi = gphi.matrix().cbegin()] GPU_LAMBDA (auto index, auto ist, auto ip) {
 															 int alpha, beta;
 															 stress_component(index, alpha, beta);
-															 auto grad_cart = cell.to_cartesian(gph[ip][ist]);
-															 return occ[ist]*real(conj(grad_cart[alpha])*grad_cart[beta]);
+															 auto grad_cart = cell.to_cartesian(_gphi[ip][ist]);
+															 return occupations_[ist]*real(conj(grad_cart[alpha])*grad_cart[beta]);
 														 });
 		
 		if(gphi.full_comm().size() > 1) gphi.full_comm().all_reduce_in_place_n(raw_pointer_cast(stress1d.data_elements()), 6);
@@ -103,10 +103,10 @@ private:
 		auto efield = operations::gradient(potential);
 
 		auto stress1d = gpu::run(6, gpu::reduce(efield.basis().local_size()), 0.0,
-														 [cell = efield.basis().cell(), ef = begin(efield.linear())] GPU_LAMBDA (auto index, auto ip) {
+														 [cell = efield.basis().cell(), _efield = efield.linear().cbegin()] GPU_LAMBDA (auto index, auto ip) {
 															 int alpha, beta;
 															 stress_component(index, alpha, beta);
-															 auto ef_cart = cell.to_cartesian(ef[ip]);
+															 auto ef_cart = cell.to_cartesian(_efield[ip]);
 															 return ef_cart[alpha]*ef_cart[beta];
 														 });
 
@@ -180,8 +180,8 @@ private:
 				auto ionic_short_range = electrons.atomic_pot().local_potential(electrons.states_comm(), electrons.density_basis(), ions, iatom);
 				
 				auto force_cov = -gpu::run(gpu::reduce(electrons.density_basis().local_size()), zero<vector3<double, inq::covariant>>(),
-																	 [v1 = begin(ionic_long_range.linear()), v2 = begin(ionic_short_range.linear()), gdensityp = begin(gdensity.linear())] GPU_LAMBDA (auto ip) {
-																		 return (v1[ip] + v2[ip])*gdensityp[ip];
+																	 [_ionic_long_range = ionic_long_range.linear().cbegin(), _ionic_short_range = ionic_short_range.linear().cbegin(), _gdensity = gdensity.linear().begin()] GPU_LAMBDA (auto ip) {
+																		 return (_ionic_long_range[ip] + _ionic_short_range[ip])*_gdensity[ip];
 																	 });
 
 				forces_local[iatom] = electrons.density_basis().volume_element()*ions.cell().to_cartesian(force_cov);

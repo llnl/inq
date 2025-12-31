@@ -24,7 +24,6 @@ namespace observables {
 
 template <typename HamiltonianType>
 basis::field<basis::real_space, vector3<double, covariant>> current_density(const systems::ions & ions, systems::electrons const & electrons, HamiltonianType const & ham){
-
 	CALI_CXX_MARK_FUNCTION;
 	
 	basis::field<basis::real_space, vector3<double, covariant>> cdensity(electrons.density_basis());
@@ -37,10 +36,10 @@ basis::field<basis::real_space, vector3<double, covariant>> current_density(cons
 
 		ham.projectors_all().position_commutator(phi, gphi, phi.kpoint() + ham.uniform_vector_potential());
 		
-    gpu::run(phi.basis().part().local_size(),
-             [nst = phi.set_part().local_size(), occ = begin(electrons.occupations()[iphi]),
-              ph = begin(phi.matrix()), gph = begin(gphi.matrix()), cdens = begin(cdensity.linear())] GPU_LAMBDA (auto ip){
-               for(int ist = 0; ist < nst; ist++) cdens[ip] += 0.5*occ[ist]*imag(conj(ph[ip][ist])*gph[ip][ist] - conj(gph[ip][ist])*ph[ip][ist]);
+		gpu::run(phi.basis().part().local_size(),
+             [nst = phi.set_part().local_size(), _occupations = electrons.occupations()[iphi].cbegin(),
+              _phi = phi.matrix().cbegin(), _gphi = gphi.matrix().cbegin(), _cdensity = cdensity.linear().begin()] GPU_LAMBDA (auto ip){
+               for(int ist = 0; ist < nst; ist++) _cdensity[ip] += 0.5*_occupations[ist]*imag(conj(_phi[ip][ist])*_gphi[ip][ist] - conj(_gphi[ip][ist])*_phi[ip][ist]);
              });
 		iphi++;
 	}
