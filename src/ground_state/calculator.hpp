@@ -111,6 +111,14 @@ public:
 		
 		results res;
 		operations::preconditioner prec;
+
+		if(solver_.verbose_output() and console) {
+			console->info("\nSCF solver:\n  {:20} = {}\n  {:20} = {}\n  {:20} = {}\n  {:20} = {:}\n",
+										"eigensolver",       solver_.eigensolver(),
+										"mixer",             solver_.mixing_algorithm(),
+										"mixing",            solver_.mixing(),
+										"energy tolerance",  solver_.energy_tolerance());
+		}
 		
 		using mix_arr_type = std::remove_reference_t<decltype(electrons.spin_density())>;
 		
