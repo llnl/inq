@@ -74,26 +74,27 @@ public:
 
 		if(spin_density.set_size() == 4) {
 			gpu::run(spin_density.basis().local_size(),
-							 [spi = begin(spin_density.matrix()), ful = begin(full_density.matrix()), cor = begin(core_density.linear())] GPU_LAMBDA (auto ip){
-								 auto dtot = spi[ip][0] + spi[ip][1];
-								 auto mag = observables::local_magnetization(spi[ip], 4);
+							 [_spin_density = spin_density.matrix().cbegin(), _core_density = core_density.linear().cbegin(), _full_density = full_density.matrix().begin()] GPU_LAMBDA (auto ip){
+								 auto dtot = _spin_density[ip][0] + _spin_density[ip][1];
+								 auto mag = observables::local_magnetization(_spin_density[ip], 4);
 								 auto dpol = mag.length();
-								 ful[ip][0] = 0.5*(dtot + dpol);
-								 ful[ip][1] = 0.5*(dtot - dpol);
+								 _full_density[ip][0] = 0.5*(dtot + dpol);
+								 _full_density[ip][1] = 0.5*(dtot - dpol);
 								 for(int ispin = 0; ispin < 2; ispin++){
-									 if(ful[ip][ispin] < 0.0) ful[ip][ispin] = 0.0;
-									 ful[ip][ispin] += cor[ip]/2;
+									 if(_full_density[ip][ispin] < 0.0) _full_density[ip][ispin] = 0.0;
+									 _full_density[ip][ispin] += _core_density[ip]/2;
 								 }
 							 });
 		} else {
 			assert(spin_density.set_size() == 1 or spin_density.set_size() == 2);
 			
 			gpu::run(spin_density.basis().local_size(),
-							 [spi = begin(spin_density.matrix()), ful = begin(full_density.matrix()), cor = begin(core_density.linear()), nspin = spin_density.set_size()] GPU_LAMBDA (auto ip){
+							 [nspin = spin_density.set_size(), _spin_density = spin_density.matrix().cbegin(), _core_density = core_density.linear().cbegin(),
+								_full_density = full_density.matrix().begin()] GPU_LAMBDA (auto ip){
 								 for(int ispin = 0; ispin < nspin; ispin++){
-									 ful[ip][ispin] = spi[ip][ispin];
-									 if(ful[ip][ispin] < 0.0) ful[ip][ispin] = 0.0;
-									 ful[ip][ispin] += cor[ip]/nspin;
+									 _full_density[ip][ispin] = _spin_density[ip][ispin];
+									 if(_full_density[ip][ispin] < 0.0) _full_density[ip][ispin] = 0.0;
+									 _full_density[ip][ispin] += _core_density[ip]/nspin;
 								 }
 							 });
 		}
@@ -107,18 +108,19 @@ public:
 	double compute_nvxc(SpinDensityType const & spin_density, VXC const & vxc) const {
 
 		CALI_CXX_MARK_FUNCTION;
+
+		auto const nspin = spin_density.local_set_size();
+		
+		assert(nspin == 1 or nspin == 2 or nspin == 4);
 		
 		auto nvxc = gpu::run(gpu::reduce(spin_density.basis().local_size()), 0.0,
-												 [den = begin(spin_density.matrix()), vx = begin(vxc.matrix()), nspin = spin_density.local_set_size()] GPU_LAMBDA (auto ip){
-													 if(nspin == 1) return den[ip][0]*vx[ip][0];
-													 if(nspin == 2) return den[ip][0]*vx[ip][0] + den[ip][1]*vx[ip][1];
-													 if(nspin == 4) return den[ip][0]*vx[ip][0] + den[ip][1]*vx[ip][1] + 2.0*den[ip][2]*vx[ip][2] - 2.0*den[ip][3]*vx[ip][3];
-													 return 0.0;
+												 [nspin, _spin_density = spin_density.matrix().cbegin(), _vxc = vxc.matrix().cbegin()] GPU_LAMBDA (auto ip){
+													 if(nspin == 1) return _spin_density[ip][0]*_vxc[ip][0];
+													 if(nspin == 2) return _spin_density[ip][0]*_vxc[ip][0] + _spin_density[ip][1]*_vxc[ip][1];
+													 return _spin_density[ip][0]*_vxc[ip][0] + _spin_density[ip][1]*_vxc[ip][1] + 2.0*_spin_density[ip][2]*_vxc[ip][2] - 2.0*_spin_density[ip][3]*_vxc[ip][3];
 												 });
 												 
-		if(spin_density.basis().comm().size() > 1) {
-			spin_density.basis().comm().all_reduce_in_place_n(&nvxc, 1, std::plus<>{});
-		}
+		if(spin_density.basis().comm().size() > 1) spin_density.basis().comm().all_reduce_in_place_n(&nvxc, 1, std::plus<>{});
 			
 		return nvxc*spin_density.basis().volume_element();
 	}

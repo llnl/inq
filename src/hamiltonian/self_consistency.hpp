@@ -110,10 +110,10 @@ public:
 			auto efield = pert_.uniform_electric_field(time);
 
 			gpu::run(vscalar.basis().local_sizes()[2], vscalar.basis().local_sizes()[1], vscalar.basis().local_sizes()[0],
-								 [point_op = vscalar.basis().point_op(), efield, vk = begin(vscalar.cubic())] GPU_LAMBDA (auto iz, auto iy, auto ix){
-									 auto rr = point_op.rvector_cartesian(ix, iy, iz);
-									 vk[ix][iy][iz] += -dot(efield, rr);
-								 });
+							 [point_op = vscalar.basis().point_op(), efield, _vscalar = vscalar.cubic().begin()] GPU_LAMBDA (auto iz, auto iy, auto ix){
+								 auto rr = point_op.rvector_cartesian(ix, iy, iz);
+								 _vscalar[ix][iy][iz] += -dot(efield, rr);
+							 });
 		}
 
 		pert_.potential(time, vscalar);
@@ -131,11 +131,11 @@ public:
 
 		auto vks = basis::field_set<basis::real_space, typename HamiltonianType::potential_type>(density_basis_, spin_density.set_size());
 
-		gpu::run(spin_density.set_size(), density_basis_.local_size(), [vk = begin(vks.matrix()), vs = begin(vscalar.linear())] GPU_LAMBDA (auto ispin, auto ipoint) {
+		gpu::run(spin_density.set_size(), density_basis_.local_size(), [_vscalar = vscalar.linear().cbegin(), _vks = vks.matrix().begin()] GPU_LAMBDA (auto ispin, auto ipoint) {
 			if(ispin < 2) {
-				vk[ipoint][ispin] = vs[ipoint];
+				_vks[ipoint][ispin] = _vscalar[ipoint];
 			} else {
-				vk[ipoint][ispin] = 0.0;
+				_vks[ipoint][ispin] = 0.0;
 			}
 		});
 		
@@ -151,8 +151,8 @@ public:
 		assert(hamiltonian.vxc_.set_size() == vks.set_size());
 		
 		gpu::run(hamiltonian.vxc_.local_set_size(), hamiltonian.vxc_.basis().local_size(),
-						 [vx = begin(hamiltonian.vxc_.matrix()), vk = begin(vks.matrix())] GPU_LAMBDA (auto is, auto ip){
-							 vk[ip][is] += vx[ip][is];
+						 [_vxc = hamiltonian.vxc_.matrix().cbegin(), _vks = vks.matrix().begin()] GPU_LAMBDA (auto is, auto ip){
+							 _vks[ip][is] += _vxc[ip][is];
 						 });
 		
 		energy.xc(exc);
