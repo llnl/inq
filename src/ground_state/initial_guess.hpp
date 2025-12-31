@@ -20,7 +20,7 @@
 namespace inq {
 namespace ground_state {
 	
-void initial_guess(const systems::ions & ions, systems::electrons & electrons, std::optional<vector3<double>> const & magnet_dir = {}){
+void initial_guess(const systems::ions & ions, systems::electrons & electrons, std::vector<vector3<double>> const & magnet_dir = {}){
 	CALI_CXX_MARK_FUNCTION;
 	
 	int iphi = 0;
@@ -43,20 +43,13 @@ void initial_guess(const systems::ions & ions, systems::electrons & electrons, s
 	electrons.update_occupations(electrons.eigenvalues());
 	
 	if(ions.size() > 0){
-		electrons.spin_density() = electrons.atomic_pot().atomic_electronic_density(electrons.states_comm(), electrons.density_basis(), ions, electrons.states());
+		electrons.spin_density() = electrons.atomic_pot().atomic_electronic_density(electrons.states_comm(), electrons.density_basis(), ions, electrons.states(), magnet_dir);
 	} else {
 		electrons.spin_density() = observables::density::calculate(electrons);
 	}
-
 	assert(fabs(operations::integral_sum(electrons.spin_density())) > 1e-16);
 	
-	observables::density::normalize(electrons.spin_density(), electrons.states().num_electrons());
-
-	if (magnet_dir) {
-		assert(electrons.spin_density().set_size() > 1);
-		auto magnet_dir_ = {magnet_dir.value()[0], magnet_dir.value()[1], magnet_dir.value()[2]};
-		observables::density::rotate_total_magnetization(electrons.spin_density(), magnet_dir_);
-	}
+  observables::density::normalize(electrons.spin_density(), electrons.states().num_electrons());
 
 }
 }
@@ -93,17 +86,19 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons);
 		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
 
-		vector3 mag_dir = {0.0, 0.0, 1.0};
+		std::vector<vector3<double>> magnet_init;
+		magnet_init.push_back({0.0, 0.0, 1.0});
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_polarized());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		auto mag = observables::total_magnetization(electrons.spin_density());
 		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
 		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																 == 1.0);
 		CHECK(Approx(sqrt(mag[0]*mag[0]+mag[1]*mag[1])/sqrt(norm(mag))).epsilon(1.e-10)			 == 0.0);
 
-		mag_dir = {0.0, 0.0, -1.0};
+		magnet_init.clear();
+		magnet_init.push_back({0.0, 0.0, -1.0});
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_polarized());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		mag = observables::total_magnetization(electrons.spin_density());
 		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
 		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																 == -1.0);
@@ -118,29 +113,34 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		ground_state::initial_guess(ions, electrons);
 		CHECK(Approx(operations::integral_sum(electrons.spin_density())).epsilon(1.e-10)		 == 1.0);
 
-		vector3 mag_dir = {0.0, 0.0, 1.0};
+		std::vector<vector3<double>> magnet_init;
+		magnet_init.push_back({0.0, 0.0, 1.0});
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		auto ch_density = observables::density::total(electrons.spin_density());
 		auto mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)											 == 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																 == 0.0);
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																 == 0.0);
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																 == 1.0);
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                       == 1.0);
+		CHECK(Approx(mag[0]).epsilon(1.e-10)                                                 == 0.0);
+		CHECK(Approx(mag[1]).epsilon(1.e-10)                                                 == 0.0);
+		CHECK(Approx(mag[2]).epsilon(1.e-10)                                                 == 1.0);
 
-		mag_dir = {0.0, 0.0, -1.0};
+		magnet_init.clear();
+		magnet_init.push_back({0.0, 0.0, -1.0});
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)											 == 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																 == 0.0);
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																 == 0.0);
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																 == -1.0);
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                       == 1.0);
+		CHECK(Approx(mag[0]).epsilon(1.e-10)                                                 == 0.0);
+		CHECK(Approx(mag[1]).epsilon(1.e-10)                                                 == 0.0);
+		CHECK(Approx(mag[2]).epsilon(1.e-10)                                                 == -1.0);
 
-		mag_dir = {1.0, 1.0, 0.0};
+		magnet_init.clear();
+		vector3<double> mv = {1.0, 1.0, 0.0};
+		mv = mv / sqrt(norm(mv));
+		magnet_init.push_back(mv);
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
 		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
@@ -148,19 +148,12 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(2.0));
 		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 0.0);
 
-		mag_dir = {-1.0, 1.0, 0.0};
+		magnet_init.clear();
+		mv = {1.0, -1.0, 0.0};
+		mv = mv / sqrt(2.0);
+		magnet_init.push_back(mv);
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons, mag_dir);
-		ch_density = observables::density::total(electrons.spin_density());
-		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																	== -1.0/sqrt(2.0));
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(2.0));
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 0.0);
-
-		mag_dir = {1.0, -1.0, 0.0};
-		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
 		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
@@ -168,9 +161,12 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== -1.0/sqrt(2.0));
 		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 0.0);
 
-		mag_dir = {-1.0, -1.0, 0.0};
+		magnet_init.clear();
+		mv = {-1.0, -1.0, 0.0};
+		mv = mv / sqrt(2.0);
+		magnet_init.push_back(mv);
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
 		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
@@ -178,16 +174,19 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== -1.0/sqrt(2.0));
 		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 0.0);
 
-		mag_dir = {1.0, 1.0, 1.0};
+		magnet_init.clear();
+		mv = {1.0, 1.0, 1.0};
+		mv = mv / sqrt(3.0);
+		magnet_init.push_back(mv);
 		electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(2).spin_non_collinear());
-		ground_state::initial_guess(ions, electrons, mag_dir);
+		ground_state::initial_guess(ions, electrons, magnet_init);
 		ch_density = observables::density::total(electrons.spin_density());
 		mag = observables::total_magnetization(electrons.spin_density());
-		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)												== 1.0);
-		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
-		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
-		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)																	== 1.0/sqrt(3.0));
+		CHECK(Approx(operations::integral(ch_density)).epsilon(1.e-10)                        == 1.0);
+		CHECK(Approx(mag[0]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
+		CHECK(Approx(mag[1]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
+		CHECK(Approx(mag[2]/sqrt(norm(mag))).epsilon(1.e-10)                                  == 1.0/sqrt(3.0));
+		
 	}
 }
 #endif
-
