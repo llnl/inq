@@ -75,7 +75,8 @@ TEST_CASE(INQ_TEST_FILE, INQ_TEST_TAG) {
 		
 	SECTION("Hydrogen atom perturbation collinear calculation") {
 		auto electrons = systems::electrons(par, ions, options::electrons{}.cutoff(30.0_Ha).extra_states(5).spin_polarized());
-		ground_state::initial_guess(ions, electrons);
+		std::vector<vector3<double>> initial_magnetization = {{0.0, 0.0, 1.0}};
+		ground_state::initial_guess(ions, electrons, initial_magnetization);
 		bvec = {0.0_beV, 0.0_beV, 0.1_beV};
 		perturbations::magnetic B{bvec};
 		auto result = ground_state::calculate(ions, electrons, options::theory{}.lda(), inq::options::ground_state{}.steepest_descent().energy_tolerance(1.e-9_Ha).max_steps(200).mixing(0.1), B);
