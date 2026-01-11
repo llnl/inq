@@ -33,19 +33,19 @@ auto operator ""_A(long double val){
 	return val*1.0_angstrom;
 }
 
-auto operator "" _nanometer(long double val){
+auto operator ""_nanometer(long double val){
 	return val*10.0*1.0_angstrom;
 }
 
-auto operator "" _nm(long double val){
+auto operator ""_nm(long double val){
 	return val*1.0_nanometer;
 }
 
-auto operator "" _picometer(long double val){
+auto operator ""_picometer(long double val){
 	return val/1000.0*1.0_nanometer;
 }
 
-auto operator "" _pm(long double val){
+auto operator ""_pm(long double val){
 	return val*1.0_picometer;
 }
 
