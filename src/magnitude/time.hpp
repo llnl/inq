@@ -33,31 +33,31 @@ auto operator ""_attosecond(long double val){
 	return inq::quantity<time>::from_atomic_units(0.0413413733352975*val);
 }
 
-auto operator "" _as(long double val){
+auto operator ""_as(long double val){
 	return val*1.0_attosecond;
 }
 
-auto operator "" _femtosecond(long double val){
+auto operator ""_femtosecond(long double val){
 	return val*1000.0_attosecond;
 }
 
-auto operator "" _fs(long double val){
+auto operator ""_fs(long double val){
 	return val*1.0_femtosecond;
 }
 
-auto operator "" _picosecond(long double val){
+auto operator ""_picosecond(long double val){
 	return val*1000.0_femtosecond;
 }
 
-auto operator "" _ps(long double val){
+auto operator ""_ps(long double val){
 	return val*1.0_picosecond;
 }
 
-auto operator "" _nanosecond(long double val){
+auto operator ""_nanosecond(long double val){
 	return val*1000.0_picosecond;
 }
 
-auto operator "" _ns(long double val){
+auto operator ""_ns(long double val){
 	return val*1.0_nanosecond;
 }
 

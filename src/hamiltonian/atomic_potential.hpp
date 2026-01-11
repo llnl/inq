@@ -216,9 +216,7 @@ namespace hamiltonian {
 
 			density.fill(0.0);
 			
-			if (magnet_dir.size() > 0) {
-				assert(magnet_dir.size() == ions.size());
-			}
+			assert(magnet_dir.size() == 0 or (long long) magnet_dir.size() == ions.size());
 			
 			for(auto iatom = part.start(); iatom < part.end(); iatom++){
 				
