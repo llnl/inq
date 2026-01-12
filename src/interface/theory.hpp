@@ -106,6 +106,34 @@ These are the options available:
 
    Example: `inq theory b3lyp`
 
+- `theory scan`
+
+   The SCAN MGGA functional.
+
+   Example: `inq theory scan`
+
+
+- `theory r2scan`
+
+   An improved version of the SCAN MGGA functional with better numerical properties.
+
+   Example: `inq theory r2scan`
+
+
+- `theory scanl`
+
+   A version of the SCAN MGGA functional that depends on the Laplacian instead of the kinetic energy density.
+
+   Example: `inq theory scanl`
+
+
+- `theory r2scanl`
+
+   Numerically improved version of the scanl MGGA functional.
+
+   Example: `inq theory r2scanl`
+
+
 - `theory functional <exchange_name> [correlation_name]`
 
    This option allows you to select any functional combination from
@@ -118,6 +146,7 @@ These are the options available:
    
    Examples: `inq theory functional XC_GGA_X_RPBE XC_GGA_C_PBE`
              `inq theory functional LDA_XC_TETER93`
+
 
 )"""";
 	}	
@@ -176,10 +205,20 @@ These are the options available:
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void scanl() const{
-		auto theo = options::theory::load(".inq/default_theory").scan();
+	void r2scan() const{
+		auto theo = options::theory::load(".inq/default_theory").r2scan();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
+
+	void scanl() const{
+		auto theo = options::theory::load(".inq/default_theory").scanl();
+		theo.save(input::environment::global().comm(), ".inq/default_theory");
+	}
+
+	void r2scanl() const{
+		auto theo = options::theory::load(".inq/default_theory").r2scanl();
+		theo.save(input::environment::global().comm(), ".inq/default_theory");
+	}	
 	
 	void functional(int exchange, int correlation = XC_NONE) const{
 		auto theo = options::theory::load(".inq/default_theory").functional(exchange, correlation);
@@ -213,6 +252,10 @@ These are the options available:
 			scan();
 		} else if(args.size() == 1 and args[0] == "scanl") {
 			scanl();
+		} else if(args.size() == 1 and args[0] == "r2scan") {
+			r2scan();
+		} else if(args.size() == 1 and args[0] == "r2scanl") {
+			r2scanl();
 
 		} else if(args[0] == "functional") {
 

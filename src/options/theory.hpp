@@ -117,6 +117,22 @@ public:
 		return inter;
 	}
 	
+	auto r2scan()  const {
+		theory inter = *this;
+		inter.hartree_potential_ = true;
+		inter.exchange_ = XC_MGGA_X_R2SCAN;
+		inter.correlation_ = XC_MGGA_C_R2SCAN;
+		return inter;
+	}
+
+	auto r2scanl()  const {
+		theory inter = *this;
+		inter.hartree_potential_ = true;
+		inter.exchange_ = XC_MGGA_X_R2SCANL;
+		inter.correlation_ = XC_MGGA_C_R2SCANL;
+		return inter;
+	}
+	
 	auto exchange_coefficient() const {
 		if(exchange() == XC_HARTREE_FOCK) return 1.0;
 		if(exchange() == XC_NONE) return 0.0;
