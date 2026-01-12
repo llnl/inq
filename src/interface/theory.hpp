@@ -220,8 +220,18 @@ These are the options available:
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}	
 	
-	void functional(int exchange, int correlation = XC_NONE) const{
-		auto theo = options::theory::load(".inq/default_theory").functional(exchange, correlation);
+	void functional(std::string const & exchange, std::string const & correlation = "XC_NONE") const {
+
+		auto exchange_id = xc_functional_get_number(exchange.c_str());
+		if(exchange_id == -1) actions::error(input::environment::global().comm(), "Unknown exchange functional '" + exchange + "'in 'theory' command");
+
+		auto correlation_id = XC_NONE;
+		if(correlation != "XC_NONE") {
+			correlation_id = xc_functional_get_number(correlation.c_str());
+			if(correlation_id == -1) actions::error(input::environment::global().comm(), "Unknown correlation functional '" + correlation + "' in 'theory' command");
+		}
+
+		auto theo = options::theory::load(".inq/default_theory").functional(exchange_id, correlation_id);
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
@@ -262,18 +272,17 @@ These are the options available:
 			if(args.size() == 1) actions::error(input::environment::global().comm(), "Missing arguments for the 'theory functional' command");			
 			if(args.size() > 3)  actions::error(input::environment::global().comm(), "Too many arguments for the 'theory functional' command");
 
-			std::replace(args[1].begin(), args[1].end(), '-', '_'); //functional names use underscores
-			auto exchange_id = xc_functional_get_number(args[1].c_str());
-			if(exchange_id == -1) actions::error(input::environment::global().comm(), "Unknown exchange functional '" + args[1] + "'in 'theory' command");
 			
-			auto correlation_id = XC_NONE;
+			std::replace(args[1].begin(), args[1].end(), '-', '_'); //functional names use underscores
+			auto exchange = args[1];
+				
+			std::string correlation = "XC_NONE";
 			if(args.size() == 3) {
 				std::replace(args[2].begin(), args[2].end(), '-', '_'); //functional names use underscores
-				correlation_id = xc_functional_get_number(args[2].c_str());
-				if(correlation_id == -1) actions::error(input::environment::global().comm(), "Unknown correlation functional '" + args[2] + "' in 'theory' command");
+				correlation = args[2];
 			}
 			
-			functional(exchange_id, correlation_id);
+			functional(exchange, correlation);
 			
 		} else {				
 			actions::error(input::environment::global().comm(), "Invalid syntax in 'theory' command");
@@ -304,7 +313,8 @@ These are the options available:
 		sub.def("scanl",           [this]() {scanl();});
 		sub.def("r2scan",          [this]() {r2scan();});
 		sub.def("r2scanl",         [this]() {r2scanl();});
-
+		sub.def("functional",      [this](std::string exchange) {functional(exchange);});
+		sub.def("functional",      [this](std::string const & exchange, std::string const & correlation) {functional(exchange, correlation);});
 	}
 #endif
 	
