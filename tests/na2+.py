@@ -17,6 +17,10 @@ pinq.electrons.cutoff(24.0, "Hartree")
 pinq.electrons.extra_electrons(-1)
 pinq.ground_state.tolerance(1e-8)
 
+pinq.theory.status()
+pinq.theory.lda()
+pinq.theory.pbe()
+
 pinq.run.ground_state()
 
 assert pinq.util.match(pinq.results.ground_state.energy.total(),            -0.643814287043, 3e-5)

@@ -160,62 +160,62 @@ These are the options available:
 		status();
 	}
 	
-	void non_interacting() const{
+	void non_interacting() const {
 		auto theo = options::theory::load(".inq/default_theory").non_interacting();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void hartree() const{
+	void hartree() const {
 		auto theo = options::theory::load(".inq/default_theory").hartree();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void hartree_fock() const{
+	void hartree_fock() const {
 		auto theo = options::theory::load(".inq/default_theory").hartree_fock();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void dft() const{
+	void dft() const {
 		auto theo = options::theory::load(".inq/default_theory").dft();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void lda() const{
+	void lda() const {
 		auto theo = options::theory::load(".inq/default_theory").lda();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void pbe() const{
+	void pbe() const {
 		auto theo = options::theory::load(".inq/default_theory").pbe();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void pbe0() const{
+	void pbe0() const {
 		auto theo = options::theory::load(".inq/default_theory").pbe0();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void b3lyp() const{
+	void b3lyp() const {
 		auto theo = options::theory::load(".inq/default_theory").b3lyp();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void scan() const{
+	void scan() const {
 		auto theo = options::theory::load(".inq/default_theory").scan();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void r2scan() const{
+	void r2scan() const {
 		auto theo = options::theory::load(".inq/default_theory").r2scan();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void scanl() const{
+	void scanl() const {
 		auto theo = options::theory::load(".inq/default_theory").scanl();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void r2scanl() const{
+	void r2scanl() const {
 		auto theo = options::theory::load(".inq/default_theory").r2scanl();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}	
@@ -282,6 +282,31 @@ These are the options available:
 		if(not run_opts.quiet) operator()();
 		actions::normal_exit();
 	}
+
+#ifdef INQ_PYTHON_INTERFACE
+	template <class PythonModule>
+	void python_interface(PythonModule & module) const {
+		namespace py = pybind11;
+		using namespace pybind11::literals;
+
+		auto sub = module.def_submodule("theory", help());
+		
+		sub.def("status",          &status);
+		sub.def("non_interacting", [this]() {non_interacting();});
+		sub.def("hartree",         [this]() {hartree();});
+		sub.def("hartree-fock",    [this]() {hartree_fock();}); 
+		sub.def("dft",             [this]() {dft();});
+		sub.def("lda",             [this]() {lda();});
+		sub.def("pbe",             [this]() {pbe();});
+		sub.def("pbe0",            [this]() {pbe0();});
+		sub.def("b3lyp",           [this]() {b3lyp();});
+		sub.def("scan",            [this]() {scan();});
+		sub.def("scanl",           [this]() {scanl();});
+		sub.def("r2scan",          [this]() {r2scan();});
+		sub.def("r2scanl",         [this]() {r2scanl();});
+
+	}
+#endif
 	
 } const theory;
 
