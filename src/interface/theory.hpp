@@ -43,81 +43,148 @@ functional from libxc.
 
 These are the options available:
 
-- `theory`
+- Shell:  `theory`
+  Python: `theory.status()`
 
-   Without any argument, `theory` will just print the current theory level that is set.
+  Without any argument (or `status()` in python), `theory` will just
+  print the current theory level that is set.
 
-   Example: `inq theory`.
+  Example: `inq theory`.
+           `pinq.theory.status()`
 
-- `theory dft` (default)
 
-   This is the default, DFT in the PBE approximation is used to model
-   the electron-electron interaction.
+- Shell:  `theory dft` (default)
+  Python: `theory.dft()` (default)
 
-   Example: `inq theory dft`
-`
-- `theory non-interacting`
+  This is the default, DFT in the PBE approximation is used to model
+  the electron-electron interaction.
 
-   There is no electron-electron interaction, particles are assumed to
-   be independent.
+  Example: `inq theory dft`
+           `pinq.theory.dft()`
 
-   Example: `inq theory non-interacting`
 
-- `theory Hartree`
+- Shell:  `theory non-interacting`
+  Python: `theory.non_interacting()`
 
-   Particles only interact through classical electrostatics. Note that
-   as implemented in inq, hartree does not include a self-interaction
-   correction term.
+  There is no electron-electron interaction, particles are assumed to
+  be independent.
 
-   Example: `inq theory Hartree`
+  Example: `inq theory non-interacting`
+           `pinq.theory.non_interacting()`
 
-- `theory Hartree-Fock`
 
-   Exchange is modeled by the Hartree-Fock method. Note that this
-   method is much more expensive than pure DFT.
+- Shell:  `theory Hartree`
 
-   Example: `inq theory Hartree-Fock`
+  Particles only interact through classical electrostatics. Note that
+  as implemented in inq, hartree does not include a self-interaction
+  correction term.
 
-- `theory lda`
+  Example: `inq theory Hartree`
+           `pinq.theory.dft()`
 
-   The local density approximation in DFT.
 
-   Example: `inq theory lda`
+- Shell:  `theory Hartree-Fock`
+  Python: `theory.hartree_fock()`
 
-- `theory pbe`
+  Exchange is modeled by the Hartree-Fock method. Note that this
+  method is much more expensive than pure DFT.
 
-   The PBE GGA approximation in DFT.
+  Example: `inq theory Hartree-Fock`
+           `pinq.theory.hartree_fock()`
 
-   Example: `inq theory pbe`
 
-- `theory pbe0`
+- Shell:  `theory lda`
+  Python: `theory.lda()`
 
-   The PBE0 (also known as PBEH) hybrid functional. Note that this
-   functional includes Hartree-Fock exact exchange, so it is much more
-   computationally expensive than GGA functionals like pbe.
+  The local density approximation in DFT.
 
-   Example: `inq theory pbe0`
+  Example: `inq theory lda`
+           `pinq.theory.lda()`
 
-- `theory b3lyp`
 
-   The B3LYP hybrid functional. Note that this functional includes
-   Hartree-Fock exact exchange, so it is much more computationally
-   expensive than GGA functionals like pbe.
+- Shell:  `theory pbe`
+  Python: `theory.pbe()`
 
-   Example: `inq theory b3lyp`
+  The PBE GGA approximation in DFT.
 
-- `theory functional <exchange_name> [correlation_name]`
+  Example: `inq theory pbe`
+           `pinq.theory.pbe()`
 
-   This option allows you to select any functional combination from
-   the libxc library using the functional names (functional id numbers
-   are not supported). Note that the correlation functional is
-   optional, it is okay to pass just one functional. You can find a
-   list of libxc functionals here [1].
 
-   [1] https://www.tddft.org/programs/libxc/functionals/
-   
-   Examples: `inq theory functional XC_GGA_X_RPBE XC_GGA_C_PBE`
-             `inq theory functional LDA_XC_TETER93`
+- Shell:  `theory pbe0`
+  Python: `theory.pbe0()`
+
+  The PBE0 (also known as PBEH) hybrid functional. Note that this
+  functional includes Hartree-Fock exact exchange, so it is much more
+  computationally expensive than GGA functionals like pbe.
+
+  Example: `inq theory pbe0`
+           `pinq.theory.pbe0()`
+
+
+- Shell:  `theory b3lyp`
+  Python: `theory.b3lyp()`
+
+  The B3LYP hybrid functional. Note that this functional includes
+  Hartree-Fock exact exchange, so it is much more computationally
+  expensive than GGA functionals like pbe.
+
+  Example: `inq theory b3lyp`
+           `pinq.theory.b3lyp()`
+
+
+- Shell:  `theory scan`
+  Python: `theory.scan()`
+
+  The SCAN MGGA functional.
+
+  Example: `inq theory scan`
+           `pinq.theory.scan()`
+
+
+- Shell:  `theory r2scan`
+  Python: `theory.r2scan()`
+
+  An improved version of the SCAN MGGA functional with better numerical properties.
+
+  Example: `inq theory r2scan`
+           `pinq.theory.r2scan()`
+
+
+- Shell:  `theory scanl`
+  Python: `theory.scanl()`
+
+  A version of the SCAN MGGA functional that depends on the Laplacian instead of the kinetic energy density.
+
+  Example: `inq theory scanl`
+           `pinq.theory.scanl()`
+
+
+- Shell:  `theory r2scanl`
+  Python: `theory.r2scanl()`
+  Numerically improved version of the scanl MGGA functional.
+
+  Example: `inq theory r2scanl`
+           `pinq.theory.r2scanl()`
+
+
+- Shell:  `theory functional <exchange_name> [correlation_name]`
+  Python: `theory.functional("exchange_name" [, "correlation_name"])`
+
+  This option allows you to select any functional combination from the
+  libxc library using the functional names (functional id numbers are
+  not supported). Note that the correlation functional is optional, it
+  is okay to pass just one functional. For python you have to pass one
+  or two strings with the name of the functional. You can find a list
+  of libxc functionals here [1].
+
+  [1] https://libxc.gitlab.io/functionals/
+
+  Examples: `inq theory functional XC_GGA_X_RPBE xc_gga_c_pbe`
+            `inq theory functional LDA_XC_TETER93`
+            `pinq.theory.functional("XC_GGA_X_RPBE", "XC_GGA_C_PBE")`
+            `pinq.theory.functional("lda_xc_teter93")`
+
 
 )"""";
 	}	
@@ -131,58 +198,78 @@ These are the options available:
 		status();
 	}
 	
-	void non_interacting() const{
+	void non_interacting() const {
 		auto theo = options::theory::load(".inq/default_theory").non_interacting();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void hartree() const{
+	void hartree() const {
 		auto theo = options::theory::load(".inq/default_theory").hartree();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void hartree_fock() const{
+	void hartree_fock() const {
 		auto theo = options::theory::load(".inq/default_theory").hartree_fock();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void dft() const{
+	void dft() const {
 		auto theo = options::theory::load(".inq/default_theory").dft();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void lda() const{
+	void lda() const {
 		auto theo = options::theory::load(".inq/default_theory").lda();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void pbe() const{
+	void pbe() const {
 		auto theo = options::theory::load(".inq/default_theory").pbe();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void pbe0() const{
+	void pbe0() const {
 		auto theo = options::theory::load(".inq/default_theory").pbe0();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
-	void b3lyp() const{
+	void b3lyp() const {
 		auto theo = options::theory::load(".inq/default_theory").b3lyp();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void scan() const{
+	void scan() const {
 		auto theo = options::theory::load(".inq/default_theory").scan();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 
-	void scanl() const{
-		auto theo = options::theory::load(".inq/default_theory").scan();
+	void r2scan() const {
+		auto theo = options::theory::load(".inq/default_theory").r2scan();
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
+
+	void scanl() const {
+		auto theo = options::theory::load(".inq/default_theory").scanl();
+		theo.save(input::environment::global().comm(), ".inq/default_theory");
+	}
+
+	void r2scanl() const {
+		auto theo = options::theory::load(".inq/default_theory").r2scanl();
+		theo.save(input::environment::global().comm(), ".inq/default_theory");
+	}	
 	
-	void functional(int exchange, int correlation = XC_NONE) const{
-		auto theo = options::theory::load(".inq/default_theory").functional(exchange, correlation);
+	void functional(std::string const & exchange, std::string const & correlation = "XC_NONE") const {
+
+		auto exchange_id = xc_functional_get_number(exchange.c_str());
+		if(exchange_id == -1) actions::error(input::environment::global().comm(), "Unknown exchange functional '" + exchange + "'in 'theory' command");
+
+		auto correlation_id = XC_NONE;
+		if(correlation != "XC_NONE") {
+			correlation_id = xc_functional_get_number(correlation.c_str());
+			if(correlation_id == -1) actions::error(input::environment::global().comm(), "Unknown correlation functional '" + correlation + "' in 'theory' command");
+		}
+
+		auto theo = options::theory::load(".inq/default_theory").functional(exchange_id, correlation_id);
 		theo.save(input::environment::global().comm(), ".inq/default_theory");
 	}
 	
@@ -213,24 +300,27 @@ These are the options available:
 			scan();
 		} else if(args.size() == 1 and args[0] == "scanl") {
 			scanl();
+		} else if(args.size() == 1 and args[0] == "r2scan") {
+			r2scan();
+		} else if(args.size() == 1 and args[0] == "r2scanl") {
+			r2scanl();
 
 		} else if(args[0] == "functional") {
 
 			if(args.size() == 1) actions::error(input::environment::global().comm(), "Missing arguments for the 'theory functional' command");			
 			if(args.size() > 3)  actions::error(input::environment::global().comm(), "Too many arguments for the 'theory functional' command");
 
-			std::replace(args[1].begin(), args[1].end(), '-', '_'); //functional names use underscores
-			auto exchange_id = xc_functional_get_number(args[1].c_str());
-			if(exchange_id == -1) actions::error(input::environment::global().comm(), "Unknown exchange functional '" + args[1] + "'in 'theory' command");
 			
-			auto correlation_id = XC_NONE;
+			std::replace(args[1].begin(), args[1].end(), '-', '_'); //functional names use underscores
+			auto exchange = args[1];
+				
+			std::string correlation = "XC_NONE";
 			if(args.size() == 3) {
 				std::replace(args[2].begin(), args[2].end(), '-', '_'); //functional names use underscores
-				correlation_id = xc_functional_get_number(args[2].c_str());
-				if(correlation_id == -1) actions::error(input::environment::global().comm(), "Unknown correlation functional '" + args[2] + "' in 'theory' command");
+				correlation = args[2];
 			}
 			
-			functional(exchange_id, correlation_id);
+			functional(exchange, correlation);
 			
 		} else {				
 			actions::error(input::environment::global().comm(), "Invalid syntax in 'theory' command");
@@ -239,6 +329,32 @@ These are the options available:
 		if(not run_opts.quiet) operator()();
 		actions::normal_exit();
 	}
+
+#ifdef INQ_PYTHON_INTERFACE
+	template <class PythonModule>
+	void python_interface(PythonModule & module) const {
+		namespace py = pybind11;
+		using namespace pybind11::literals;
+
+		auto sub = module.def_submodule("theory", help());
+		
+		sub.def("status",          &status);
+		sub.def("non_interacting", [this]() {non_interacting();});
+		sub.def("hartree",         [this]() {hartree();});
+		sub.def("hartree-fock",    [this]() {hartree_fock();}); 
+		sub.def("dft",             [this]() {dft();});
+		sub.def("lda",             [this]() {lda();});
+		sub.def("pbe",             [this]() {pbe();});
+		sub.def("pbe0",            [this]() {pbe0();});
+		sub.def("b3lyp",           [this]() {b3lyp();});
+		sub.def("scan",            [this]() {scan();});
+		sub.def("scanl",           [this]() {scanl();});
+		sub.def("r2scan",          [this]() {r2scan();});
+		sub.def("r2scanl",         [this]() {r2scanl();});
+		sub.def("functional",      [this](std::string exchange) {functional(exchange);});
+		sub.def("functional",      [this](std::string const & exchange, std::string const & correlation) {functional(exchange, correlation);});
+	}
+#endif
 	
 } const theory;
 
